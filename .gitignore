@@ -22,7 +22,6 @@ desktop.ini
 *.dll
 *.so
 *.dylib
-caslette-server
 caslette-server.exe
 
 # Test binary, built with `go test -c`
