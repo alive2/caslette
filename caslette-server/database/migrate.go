@@ -21,6 +21,14 @@ func Migrate(db *gorm.DB) {
 		&models.Diamond{},
 		&models.UserRole{},
 		&models.RolePermission{},
+		&models.UserPermission{},
+		// Poker game models
+		&models.PokerTable{},
+		&models.TablePlayer{},
+		&models.GameHand{},
+		&models.PlayerHand{},
+		&models.Bet{},
+		&models.Transaction{},
 	)
 	if err != nil {
 		log.Fatal("Failed to migrate database:", err)

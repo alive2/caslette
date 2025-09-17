@@ -59,6 +59,86 @@ export const userApi = {
     });
     return response.data;
   },
+
+  removeRole: async (userId: number, roleId: number) => {
+    const response = await api.delete(`/users/${userId}/roles/${roleId}`);
+    return response.data;
+  },
+
+  assignPermissions: async (id: number, permissionIds: number[]) => {
+    const response = await api.post(`/users/${id}/permissions`, {
+      permission_ids: permissionIds,
+    });
+    return response.data;
+  },
+
+  getUserPermissions: async (id: number) => {
+    const response = await api.get(`/users/${id}/permissions`);
+    return response.data;
+  },
+
+  removePermission: async (userId: number, permissionId: number) => {
+    const response = await api.delete(
+      `/users/${userId}/permissions/${permissionId}`
+    );
+    return response.data;
+  },
+};
+
+export const roleApi = {
+  getRoles: async () => {
+    const response = await api.get("/roles");
+    return response.data;
+  },
+
+  getRole: async (id: number) => {
+    const response = await api.get(`/roles/${id}`);
+    return response.data;
+  },
+
+  createRole: async (data: { name: string; description: string }) => {
+    const response = await api.post("/roles", data);
+    return response.data;
+  },
+
+  updateRole: async (
+    id: number,
+    data: { name?: string; description?: string }
+  ) => {
+    const response = await api.put(`/roles/${id}`, data);
+    return response.data;
+  },
+
+  deleteRole: async (id: number) => {
+    const response = await api.delete(`/roles/${id}`);
+    return response.data;
+  },
+
+  assignPermissions: async (roleId: number, permissionIds: number[]) => {
+    const response = await api.post(`/roles/${roleId}/permissions`, {
+      permission_ids: permissionIds,
+    });
+    return response.data;
+  },
+
+  removePermission: async (roleId: number, permissionId: number) => {
+    const response = await api.delete(
+      `/roles/${roleId}/permissions/${permissionId}`
+    );
+    return response.data;
+  },
+};
+
+export const permissionApi = {
+  getPermissions: async () => {
+    const response = await api.get("/permissions");
+    return response.data;
+  },
+
+  getPermission: async (id: number) => {
+    const response = await api.get(`/permissions/${id}`);
+    return response.data;
+  },
 };
 
 export const diamondApi = {

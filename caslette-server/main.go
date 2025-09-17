@@ -30,6 +30,8 @@ func main() {
 	authHandler := handlers.NewAuthHandler(cfg.DB, authService)
 	userHandler := handlers.NewUserHandler(cfg.DB)
 	diamondHandler := handlers.NewDiamondHandler(cfg.DB)
+	roleHandler := handlers.NewRoleHandler(cfg.DB)
+	permissionHandler := handlers.NewPermissionHandler(cfg.DB)
 	wsHandler := websocket.NewWebSocketHandler(hub, cfg.DB, authService)
 
 	// Setup Gin router
@@ -69,6 +71,30 @@ func main() {
 				users.PUT("/:id", userHandler.UpdateUser)
 				users.DELETE("/:id", userHandler.DeleteUser)
 				users.POST("/:id/roles", userHandler.AssignRoles)
+				users.POST("/:id/permissions", userHandler.AssignPermissions)
+				users.GET("/:id/permissions", userHandler.GetUserPermissions)
+				users.DELETE("/:id/permissions/:permission_id", userHandler.RemoveUserPermission)
+			}
+
+			// Role routes
+			roles := protected.Group("/roles")
+			{
+				roles.GET("", roleHandler.GetRoles)
+				roles.GET("/:id", roleHandler.GetRole)
+				roles.POST("", roleHandler.CreateRole)
+				roles.PUT("/:id", roleHandler.UpdateRole)
+				roles.DELETE("/:id", roleHandler.DeleteRole)
+				roles.POST("/:id/permissions", roleHandler.AssignPermissions)
+			}
+
+			// Permission routes
+			permissions := protected.Group("/permissions")
+			{
+				permissions.GET("", permissionHandler.GetPermissions)
+				permissions.GET("/:id", permissionHandler.GetPermission)
+				permissions.POST("", permissionHandler.CreatePermission)
+				permissions.PUT("/:id", permissionHandler.UpdatePermission)
+				permissions.DELETE("/:id", permissionHandler.DeletePermission)
 			}
 
 			// Diamond routes

@@ -30,7 +30,7 @@ func NewUserHandler(db *gorm.DB) *UserHandler {
 
 func (h *UserHandler) GetUsers(c *gin.Context) {
 	var users []models.User
-	query := h.db.Preload("Roles")
+	query := h.db.Preload("Roles").Preload("Permissions")
 
 	// Add pagination
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -151,4 +151,131 @@ func (h *UserHandler) AssignRoles(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Roles assigned successfully"})
+}
+
+// AssignPermissionRequest represents the request to assign permissions to a user
+type AssignPermissionRequest struct {
+	PermissionIDs []uint `json:"permission_ids" binding:"required"`
+}
+
+// AssignPermissions assigns permissions directly to a user
+func (h *UserHandler) AssignPermissions(c *gin.Context) {
+	id := c.Param("id")
+	userID, err := strconv.ParseUint(id, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	var req AssignPermissionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Check if user exists
+	var user models.User
+	if err := h.db.First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Get permissions
+	var permissions []models.Permission
+	if err := h.db.Find(&permissions, req.PermissionIDs).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid permission IDs"})
+		return
+	}
+
+	// Replace user permissions
+	if err := h.db.Model(&user).Association("Permissions").Replace(permissions); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to assign permissions"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Permissions assigned successfully"})
+}
+
+// GetUserPermissions gets all permissions assigned to a user (both from roles and direct assignment)
+func (h *UserHandler) GetUserPermissions(c *gin.Context) {
+	id := c.Param("id")
+	userID, err := strconv.ParseUint(id, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	// Get user with roles and permissions
+	var user models.User
+	if err := h.db.Preload("Roles.Permissions").Preload("Permissions").First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Collect all permissions (from roles and direct assignments)
+	permissionMap := make(map[uint]models.Permission)
+
+	// Add permissions from roles
+	for _, role := range user.Roles {
+		for _, permission := range role.Permissions {
+			permissionMap[permission.ID] = permission
+		}
+	}
+
+	// Add direct user permissions
+	for _, permission := range user.Permissions {
+		permissionMap[permission.ID] = permission
+	}
+
+	// Convert map to slice
+	var allPermissions []models.Permission
+	for _, permission := range permissionMap {
+		allPermissions = append(allPermissions, permission)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"user_permissions": user.Permissions, // Direct user permissions
+		"role_permissions": permissionMap,    // All permissions from roles
+		"all_permissions":  allPermissions,   // Combined unique permissions
+	})
+}
+
+// RemoveUserPermission removes a specific permission from a user
+func (h *UserHandler) RemoveUserPermission(c *gin.Context) {
+	id := c.Param("id")
+	permissionID := c.Param("permission_id")
+
+	userID, err := strconv.ParseUint(id, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	permID, err := strconv.ParseUint(permissionID, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid permission ID"})
+		return
+	}
+
+	// Check if user exists
+	var user models.User
+	if err := h.db.First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Check if permission exists
+	var permission models.Permission
+	if err := h.db.First(&permission, permID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Permission not found"})
+		return
+	}
+
+	// Remove the permission from user
+	if err := h.db.Model(&user).Association("Permissions").Delete(&permission); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove permission"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Permission removed successfully"})
 }

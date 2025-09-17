@@ -1,0 +1,74 @@
+/* Cosmic-themed scrollbar styles */
+
+/* Webkit-based browsers (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #8b5cf6 0%, #7c3aed 50%, #6d28d9 100%);
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #a78bfa 0%, #8b5cf6 50%, #7c3aed 100%);
+    box-shadow: 0 0 8px rgba(139, 92, 246, 0.3);
+}
+
+::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(180deg, #c4b5fd 0%, #a78bfa 50%, #8b5cf6 100%);
+}
+
+::-webkit-scrollbar-corner {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #8b5cf6 rgba(255, 255, 255, 0.05);
+}
+
+/* Custom hover effects for Firefox */
+*:hover {
+    scrollbar-color: #a78bfa rgba(255, 255, 255, 0.08);
+}
+
+/* Better scrolling for smooth experience */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Custom scrollable areas with enhanced styling */
+.cosmic-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: #8b5cf6 rgba(255, 255, 255, 0.05);
+}
+
+.cosmic-scroll::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.cosmic-scroll::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 3px;
+}
+
+.cosmic-scroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #8b5cf6 0%, #7c3aed 100%);
+    border-radius: 3px;
+    transition: all 0.3s ease;
+}
+
+.cosmic-scroll::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #a78bfa 0%, #8b5cf6 100%);
+    box-shadow: 0 0 6px rgba(139, 92, 246, 0.4);
+}

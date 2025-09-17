@@ -3,6 +3,7 @@ package websocket
 import (
 	"caslette-server/auth"
 	"caslette-server/models"
+	"caslette-server/websocket/poker"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -25,6 +26,7 @@ type Hub struct {
 	broadcast  chan []byte
 	register   chan *Client
 	unregister chan *Client
+	wsHandler  *WebSocketHandler // Reference to handler for poker messages
 	mu         sync.RWMutex
 }
 
@@ -35,6 +37,60 @@ type Client struct {
 	user     *models.User
 	userID   uint
 	username string
+}
+
+// Implement poker.Client interface for Client
+func (c *Client) GetUserID() uint {
+	return c.userID
+}
+
+func (c *Client) SendError(message string) {
+	response := Message{
+		Type: "error",
+		Data: map[string]string{"error": message},
+	}
+	data, _ := json.Marshal(response)
+	select {
+	case c.send <- data:
+	default:
+		// Channel full, skip
+	}
+}
+
+func (c *Client) SendSuccess(messageType string, data interface{}) {
+	response := Message{
+		Type: messageType,
+		Data: data,
+	}
+	responseData, _ := json.Marshal(response)
+	select {
+	case c.send <- responseData:
+	default:
+		// Channel full, skip
+	}
+}
+
+func (c *Client) SendMessage(msg poker.PokerMessage) {
+	data, _ := json.Marshal(msg)
+	select {
+	case c.send <- data:
+	default:
+		// Channel full, skip
+	}
+}
+
+func (c *Client) GetConnection() interface{} {
+	return c.conn
+}
+
+func (c *Client) IsConnected() bool {
+	return c.conn != nil
+}
+
+func (c *Client) Close() {
+	if c.conn != nil {
+		c.conn.Close()
+	}
 }
 
 type Message struct {
@@ -48,6 +104,7 @@ type WebSocketHandler struct {
 	hub         *Hub
 	db          *gorm.DB
 	authService *auth.AuthService
+	pokerRouter *poker.PokerRouter
 }
 
 func NewHub() *Hub {
@@ -67,6 +124,11 @@ func (h *Hub) Run() {
 			h.clients[client] = true
 			h.mu.Unlock()
 			log.Printf("User %s connected via WebSocket", client.username)
+
+			// Register with poker router if handler exists
+			if h.wsHandler != nil {
+				h.wsHandler.pokerRouter.AddClient(client.userID, client)
+			}
 
 			// Send welcome message
 			welcome := Message{
@@ -90,6 +152,11 @@ func (h *Hub) Run() {
 				delete(h.clients, client)
 				close(client.send)
 				log.Printf("User %s disconnected from WebSocket", client.username)
+
+				// Unregister from poker router if handler exists
+				if h.wsHandler != nil {
+					h.wsHandler.pokerRouter.RemoveClient(client.userID)
+				}
 			}
 			h.mu.Unlock()
 
@@ -152,11 +219,19 @@ func (h *Hub) GetConnectedUsers() []map[string]interface{} {
 }
 
 func NewWebSocketHandler(hub *Hub, db *gorm.DB, authService *auth.AuthService) *WebSocketHandler {
-	return &WebSocketHandler{
+	pokerRouter := poker.NewPokerRouter(db)
+
+	handler := &WebSocketHandler{
 		hub:         hub,
 		db:          db,
 		authService: authService,
+		pokerRouter: pokerRouter,
 	}
+
+	// Set back-reference so hub can access poker router
+	hub.wsHandler = handler
+
+	return handler
 }
 
 func (wsh *WebSocketHandler) HandleWebSocket(c *gin.Context) {
@@ -236,13 +311,27 @@ func (c *Client) readPump() {
 			default:
 				return
 			}
-		case "game_action":
-			// Handle game actions (to be implemented)
-			log.Printf("Game action from user %s: %+v", c.username, msg.Data)
+		case poker.MsgCreateTable, poker.MsgListTables, poker.MsgJoinTable, poker.MsgLeaveTable,
+			poker.MsgPlayerAction, poker.MsgStartHand, poker.MsgGameAction, poker.MsgGetGameState:
+			// Handle poker messages by converting to raw message and routing
+			rawMessage, _ := json.Marshal(msg)
+			if wsHandler := c.getWebSocketHandler(); wsHandler != nil {
+				wsHandler.pokerRouter.HandleMessage(c, rawMessage)
+			}
 		default:
 			log.Printf("Unknown message type: %s", msg.Type)
 		}
 	}
+}
+
+// Helper method to get WebSocketHandler (we'll need to store this reference)
+func (c *Client) getWebSocketHandler() *WebSocketHandler {
+	// This is a temporary solution - ideally we'd store the handler reference in Client
+	// For now, we'll access it through the hub
+	if c.hub.wsHandler != nil {
+		return c.hub.wsHandler
+	}
+	return nil
 }
 
 func (c *Client) writePump() {

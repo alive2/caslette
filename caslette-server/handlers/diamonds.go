@@ -70,7 +70,7 @@ func (h *DiamondHandler) AddDiamonds(c *gin.Context) {
 		Balance:     currentBalance + req.Amount,
 		Type:        req.Type,
 		Description: req.Description,
-		Metadata:    "{}",  // Empty JSON object instead of empty string
+		Metadata:    "{}",
 	}
 
 	if err := h.db.Create(&diamond).Error; err != nil {
@@ -112,7 +112,7 @@ func (h *DiamondHandler) DeductDiamonds(c *gin.Context) {
 		Balance:     currentBalance - req.Amount,
 		Type:        req.Type,
 		Description: req.Description,
-		Metadata:    "{}",  // Empty JSON object instead of empty string
+		Metadata:    "{}",
 	}
 
 	if err := h.db.Create(&diamond).Error; err != nil {

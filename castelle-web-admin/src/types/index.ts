@@ -8,6 +8,7 @@ export interface User {
   created_at: string;
   updated_at: string;
   roles: Role[];
+  permissions?: Permission[]; // User-specific permissions
 }
 
 export interface Role {
@@ -16,6 +17,7 @@ export interface Role {
   description: string;
   created_at: string;
   updated_at: string;
+  permissions?: Permission[];
 }
 
 export interface Permission {
@@ -27,6 +29,37 @@ export interface Permission {
   created_at: string;
   updated_at: string;
 }
+
+export interface RolePermission {
+  role_id: number;
+  permission_id: number;
+  created_at: string;
+}
+
+export interface UserPermission {
+  user_id: number;
+  permission_id: number;
+  created_at: string;
+}
+
+export interface CreateRoleRequest {
+  name: string;
+  description: string;
+}
+
+export interface UpdateRoleRequest {
+  name?: string;
+  description?: string;
+}
+
+// Default roles in the system
+export const DEFAULT_ROLES = {
+  PLAYER: "player",
+  MANAGER: "manager",
+  ADMIN: "admin",
+} as const;
+
+export const DEFAULT_ROLE = DEFAULT_ROLES.PLAYER;
 
 export interface Diamond {
   id: number;

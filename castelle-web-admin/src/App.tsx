@@ -6,10 +6,11 @@ import {
   Navigate,
 } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import AdminLogin from "./components/AdminLogin";
-import AdminAnalytics from "./components/AdminAnalytics";
-import UserManagement from "./components/UserManagement";
-import DiamondTransfers from "./components/DiamondTransfers";
+import AdminLogin from "./pages/AdminLogin";
+import AdminAnalytics from "./pages/AdminAnalytics";
+import UserManagement from "./pages/UserManagement";
+import RoleManagement from "./pages/RoleManagement";
+import DiamondTransfers from "./pages/DiamondTransfers";
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -47,6 +48,14 @@ const App: React.FC = () => {
               element={
                 <ProtectedRoute>
                   <UserManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/roles"
+              element={
+                <ProtectedRoute>
+                  <RoleManagement />
                 </ProtectedRoute>
               }
             />

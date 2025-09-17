@@ -8,7 +8,7 @@ import {
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { WebSocketProvider } from "./contexts/WebSocketContext";
 import Login from "./components/Login";
-import GamePage from "./components/GamePage";
+import HomePage from "./pages/HomePage";
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -38,7 +38,7 @@ const App: React.FC = () => {
                 path="/game"
                 element={
                   <ProtectedRoute>
-                    <GamePage />
+                    <HomePage />
                   </ProtectedRoute>
                 }
               />
