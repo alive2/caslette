@@ -36,58 +36,104 @@ class PlayerSeat extends StatelessWidget {
   }
 
   Widget _buildEmptySeat() {
-    return Container(
-      width: 120,
-      height: 80,
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      width: 80,
+      height: 60,
       decoration: BoxDecoration(
-        color: const Color(0xFF374151).withOpacity(0.3),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF374151).withOpacity(0.4),
+            const Color(0xFF1F2937).withOpacity(0.6),
+          ],
+        ),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFF6B7280).withOpacity(0.5),
-          style: BorderStyle.solid,
+          color: const Color(0xFF6B7280).withOpacity(0.6),
+          width: 1.5,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Center(
         child: Text(
           'Seat $seatNumber',
-          style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.6),
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+          ),
         ),
       ),
     );
   }
 
   Widget _buildJoinableSeat() {
-    return GestureDetector(
-      onTap: onJoinSeat,
-      child: Container(
-        width: 120,
-        height: 80,
-        decoration: BoxDecoration(
-          color: const Color(0xFF059669).withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: const Color(0xFF059669).withOpacity(0.5),
-            width: 2,
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.add_circle_outline,
-              color: Color(0xFF059669),
-              size: 24,
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onJoinSeat,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          width: 80,
+          height: 60,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                const Color(0xFF10B981).withOpacity(0.3),
+                const Color(0xFF059669).withOpacity(0.4),
+              ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Join Seat $seatNumber',
-              style: const TextStyle(
-                color: Color(0xFF059669),
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFF10B981), width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF10B981).withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 0),
               ),
-            ),
-          ],
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.add_circle_outline,
+                  color: Colors.white,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Join Seat $seatNumber',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -99,28 +145,52 @@ class PlayerSeat extends StatelessWidget {
     final isMyPlayer = player!.userId == currentUserId;
     final showCards = isMyPlayer && player!.holeCards.isNotEmpty;
 
-    return Container(
-      width: 120,
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      width: 80,
       decoration: BoxDecoration(
-        color: isCurrentPlayer
-            ? const Color(0xFF9333EA).withOpacity(0.2)
-            : const Color(0xFF1F2937),
+        gradient: isCurrentPlayer
+            ? LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  const Color(0xFF7C3AED).withOpacity(0.4),
+                  const Color(0xFF9333EA).withOpacity(0.3),
+                ],
+              )
+            : LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [const Color(0xFF374151), const Color(0xFF1F2937)],
+              ),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isCurrentPlayer
-              ? const Color(0xFF9333EA)
-              : const Color(0xFF374151),
-          width: isCurrentPlayer ? 2 : 1,
+              ? const Color(0xFF7C3AED)
+              : const Color(0xFF4B5563),
+          width: isCurrentPlayer ? 2.5 : 1.5,
         ),
         boxShadow: isCurrentPlayer
             ? [
                 BoxShadow(
-                  color: const Color(0xFF9333EA).withOpacity(0.3),
-                  blurRadius: 8,
+                  color: const Color(0xFF7C3AED).withOpacity(0.5),
+                  blurRadius: 12,
+                  spreadRadius: 1,
                   offset: const Offset(0, 0),
                 ),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 6,
+                  offset: const Offset(0, 3),
+                ),
               ]
-            : null,
+            : [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Padding(
         padding: const EdgeInsets.all(8),
@@ -130,22 +200,50 @@ class PlayerSeat extends StatelessWidget {
             // Player name and status
             Row(
               children: [
-                // Dealer button
+                // Enhanced animated dealer button
                 if (player!.isDealer)
-                  Container(
-                    width: 16,
-                    height: 16,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFF59E0B),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 500),
+                    width: 18,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Color(0xFFFFD700), // Gold
+                          Color(0xFFF59E0B), // Amber
+                        ],
+                      ),
                       shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 1.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFFFD700).withOpacity(0.6),
+                          blurRadius: 8,
+                          offset: const Offset(0, 0),
+                        ),
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.3),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: const Center(
                       child: Text(
                         'D',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black,
+                              offset: Offset(0, 1),
+                              blurRadius: 1,
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -452,17 +550,63 @@ class _BettingControlsState extends State<BettingControls> {
   }
 
   Widget _buildActionButton(String text, Color color, VoidCallback onPressed) {
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        foregroundColor: Colors.white,
-        minimumSize: const Size(80, 40),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-      child: Text(
-        text,
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        child: ElevatedButton(
+          onPressed: onPressed,
+          style:
+              ElevatedButton.styleFrom(
+                backgroundColor: color,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(85, 45),
+                elevation: 8,
+                shadowColor: color.withOpacity(0.4),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ).copyWith(
+                overlayColor: MaterialStateProperty.resolveWith<Color?>((
+                  Set<MaterialState> states,
+                ) {
+                  if (states.contains(MaterialState.pressed)) {
+                    return Colors.white.withOpacity(0.1);
+                  }
+                  if (states.contains(MaterialState.hovered)) {
+                    return Colors.white.withOpacity(0.05);
+                  }
+                  return null;
+                }),
+              ),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.white.withOpacity(0.2), Colors.transparent],
+              ),
+            ),
+            child: Center(
+              child: Text(
+                text,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                  shadows: [
+                    Shadow(
+                      color: Colors.black,
+                      offset: Offset(0, 1),
+                      blurRadius: 2,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

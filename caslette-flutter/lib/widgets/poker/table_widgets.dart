@@ -19,35 +19,25 @@ class PokerTableLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    final isLandscape = screenSize.width > screenSize.height;
+
     return Container(
-      decoration: BoxDecoration(
-        gradient: const RadialGradient(
-          center: Alignment.center,
-          radius: 1.5,
-          colors: [
-            Color(0xFF059669), // Emerald center
-            Color(0xFF064E3B), // Dark emerald edge
-          ],
+      width: double.infinity,
+      height: double.infinity,
+      decoration: const BoxDecoration(
+        image: DecorationImage(
+          image: AssetImage('assets/images/poker_table_texture.png'),
+          fit: BoxFit.cover,
+          scale: 0.5,
         ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(isLandscape ? 12 : 8),
         child: Column(
           children: [
-            // Table info header
-            _buildTableHeader(),
-            const SizedBox(height: 16),
-
-            // Main table area
-            Expanded(child: _buildTableArea()),
+            // Main table area (takes full screen)
+            Expanded(child: _buildFullscreenTableArea()),
 
             // Player controls (if applicable)
             if (_shouldShowControls())
@@ -60,165 +50,226 @@ class PokerTableLayout extends StatelessWidget {
     );
   }
 
-  Widget _buildTableHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                table.name,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(
-                'Blinds: ${table.smallBlind}/${table.bigBlind}',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.8),
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                'Players: ${table.currentPlayers}/${table.maxPlayers}',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              Text(
-                'Hand #${table.handNumber}',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.8),
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildFullscreenTableArea() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Calculate responsive table size
+        final screenWidth = constraints.maxWidth;
+        final screenHeight = constraints.maxHeight;
+        final tableWidth = (screenWidth * 0.8).clamp(280.0, 500.0);
+        final tableHeight = (screenHeight * 0.5).clamp(160.0, 280.0);
 
-  Widget _buildTableArea() {
-    return Stack(
-      children: [
-        // Table oval
-        Center(
-          child: Container(
-            width: 320,
-            height: 180,
-            decoration: BoxDecoration(
-              color: const Color(0xFF065F46),
-              borderRadius: BorderRadius.circular(90),
-              border: Border.all(color: const Color(0xFFF59E0B), width: 3),
-            ),
-          ),
-        ),
-
-        // Center area with community cards and pot
-        Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Community cards
-              if (table.communityCards.isNotEmpty)
-                CommunityCards(
-                  cards: table.communityCards,
-                  bettingRound: table.bettingRound,
-                  cardWidth: 40,
-                  cardHeight: 56,
-                ),
-
-              const SizedBox(height: 12),
-
-              // Pot information
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
+        return Stack(
+          children: [
+            // Transparent table overlay for content positioning
+            Center(
+              child: Container(
+                width: tableWidth,
+                height: tableHeight,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF59E0B).withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFF59E0B), width: 1),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.monetization_on,
-                      color: Color(0xFFF59E0B),
-                      size: 16,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Pot: ${table.pot}',
-                      style: const TextStyle(
-                        color: Color(0xFFF59E0B),
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Betting round indicator
-              Container(
-                margin: const EdgeInsets.only(top: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF9333EA).withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  table.bettingRound.displayName,
-                  style: const TextStyle(
-                    color: Color(0xFF9333EA),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(tableHeight / 2),
+                  // Optional: subtle border to define the table area
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.1),
+                    width: 2,
                   ),
                 ),
               ),
-            ],
-          ),
-        ),
+            ),
 
-        // Player seats arranged around the table
-        ..._buildPlayerSeats(),
-      ],
+            // Center area with community cards and pot
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Community cards
+                  if (table.communityCards.isNotEmpty)
+                    CommunityCards(
+                      cards: table.communityCards,
+                      bettingRound: table.bettingRound,
+                      cardWidth: 48,
+                      cardHeight: 68,
+                    ),
+
+                  const SizedBox(height: 16),
+
+                  // Enhanced pot with gaming effects
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 500),
+                    curve: Curves.elasticOut,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          const Color(0xFFFFD700).withOpacity(0.9), // Gold
+                          const Color(0xFFF59E0B).withOpacity(0.8), // Amber
+                          const Color(0xFFD97706).withOpacity(0.7), // Orange
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(25),
+                      border: Border.all(
+                        color: const Color(0xFFFFD700),
+                        width: 3,
+                      ),
+                      boxShadow: [
+                        // Outer glow effect
+                        BoxShadow(
+                          color: const Color(0xFFFFD700).withOpacity(0.6),
+                          blurRadius: 20,
+                          spreadRadius: 3,
+                          offset: const Offset(0, 0),
+                        ),
+                        // Main shadow
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 6),
+                        ),
+                        // Inner highlight
+                        BoxShadow(
+                          color: Colors.white.withOpacity(0.3),
+                          blurRadius: 3,
+                          offset: const Offset(0, -1),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Enhanced diamond with glow
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFFFD700).withOpacity(0.5),
+                                blurRadius: 8,
+                                offset: const Offset(0, 0),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.diamond,
+                            color: Colors.white,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'POT: ${table.pot}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.2,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black,
+                                offset: Offset(1, 1),
+                                blurRadius: 2,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Enhanced betting round indicator
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 400),
+                    margin: const EdgeInsets.only(top: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          const Color(0xFF7C3AED).withOpacity(0.8),
+                          const Color(0xFF9333EA).withOpacity(0.7),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: const Color(0xFF7C3AED),
+                        width: 2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF7C3AED).withOpacity(0.4),
+                          blurRadius: 12,
+                          offset: const Offset(0, 0),
+                        ),
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 6,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      table.bettingRound.displayName.toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.0,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black,
+                            offset: Offset(0, 1),
+                            blurRadius: 2,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Player seats arranged around the table
+            ..._buildPlayerSeats(
+              tableWidth,
+              tableHeight,
+              constraints,
+              currentUserId,
+            ),
+          ],
+        );
+      },
     );
   }
 
-  List<Widget> _buildPlayerSeats() {
+  List<Widget> _buildPlayerSeats(
+    double tableWidth,
+    double tableHeight,
+    BoxConstraints constraints,
+    String? currentUserId,
+  ) {
     final seats = <Widget>[];
 
-    // Define seat positions around the table (8 seats)
+    // Create predefined seat positions around the table for better control
     final seatPositions = [
-      const Alignment(0, -0.8), // Top center
-      const Alignment(0.6, -0.6), // Top right
-      const Alignment(0.8, 0), // Right
-      const Alignment(0.6, 0.6), // Bottom right
-      const Alignment(0, 0.8), // Bottom center
-      const Alignment(-0.6, 0.6), // Bottom left
-      const Alignment(-0.8, 0), // Left
-      const Alignment(-0.6, -0.6), // Top left
+      const Alignment(0, -0.85), // Top center
+      const Alignment(0.65, -0.65), // Top right
+      const Alignment(0.85, 0), // Right center
+      const Alignment(0.65, 0.65), // Bottom right
+      const Alignment(0, 0.85), // Bottom center
+      const Alignment(-0.65, 0.65), // Bottom left
+      const Alignment(-0.85, 0), // Left center
+      const Alignment(-0.65, -0.65), // Top left
     ];
 
     for (int i = 0; i < table.maxPlayers && i < seatPositions.length; i++) {

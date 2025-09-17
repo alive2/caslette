@@ -164,6 +164,16 @@ class PokerNotifier extends StateNotifier<PokerState> {
     state = state.copyWith(isLoading: loading, error: null);
   }
 
+  // Set current table (for viewing/joining)
+  void setCurrentTable(PokerTable table, String tableId) {
+    if (_isDisposed) return;
+    state = state.copyWith(
+      currentTable: table,
+      currentTableId: tableId,
+      error: null,
+    );
+  }
+
   // Join a poker table
   void joinTable(String tableId, int seatNumber, int buyInAmount) {
     if (_isDisposed) return;

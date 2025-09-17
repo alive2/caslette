@@ -30,14 +30,36 @@ class _PokerGameScreenState extends ConsumerState<PokerGameScreen> {
     final currentUser = ref.read(authProvider.notifier).currentUser;
 
     if (authState == AuthState.authenticated && currentUser != null) {
-      // Connect to poker WebSocket if not already connected
-      final pokerState = ref.read(pokerProvider);
-      if (!pokerState.isConnected) {
-        ref.read(pokerProvider.notifier).connect(currentUser.token);
-      }
+      final pokerNotifier = ref.read(pokerProvider.notifier);
 
-      // Request game state for this table
-      ref.read(pokerProvider.notifier).requestGameState();
+      try {
+        // Find the table from available tables
+        final availableTables = ref.read(availableTablesProvider);
+        final table = availableTables.firstWhere(
+          (t) => t.id == widget.tableId,
+          orElse: () => throw Exception('Table not found'),
+        );
+
+        print('DEBUG: Found table: ${table.name} (ID: ${table.id})');
+
+        // Set this table as the current table
+        pokerNotifier.setCurrentTable(table, widget.tableId);
+
+        // Request game state for this table
+        pokerNotifier.requestGameState();
+      } catch (e) {
+        print('DEBUG: Error finding table: $e');
+        // Show error and navigate back
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Table not found: ${widget.tableId}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          Navigator.of(context).pop();
+        }
+      }
     }
   }
 
@@ -48,107 +70,8 @@ class _PokerGameScreenState extends ConsumerState<PokerGameScreen> {
     final table = pokerState.currentTable;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: RadialGradient(
-            center: Alignment.center,
-            radius: 1.2,
-            colors: [
-              Color(0xFF064E3B), // Dark emerald
-              Color(0xFF0F172A), // Slate-900
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Header with back button and table info
-              _buildHeader(table),
-
-              // Main game area
-              Expanded(
-                child: _buildGameContent(pokerState, currentUser?.id, table),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader(poker.PokerTable? table) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          IconButton(
-            onPressed: () {
-              // Leave table if joined before going back
-              if (_hasJoinedTable) {
-                ref.read(pokerProvider.notifier).leaveTable();
-              }
-              Navigator.of(context).pop();
-            },
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  table?.name ?? 'Loading...',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                if (table != null)
-                  Text(
-                    'Blinds: ${table.smallBlind}/${table.bigBlind} • Players: ${table.currentPlayers}/${table.maxPlayers}',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.7),
-                      fontSize: 12,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          // Connection status
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: ref.watch(pokerConnectionProvider)
-                  ? Colors.green
-                  : Colors.red,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  ref.watch(pokerConnectionProvider)
-                      ? Icons.wifi
-                      : Icons.wifi_off,
-                  color: Colors.white,
-                  size: 14,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  ref.watch(pokerConnectionProvider) ? 'Connected' : 'Offline',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+      backgroundColor: Colors.black,
+      body: _buildGameContent(pokerState, currentUser?.id, table),
     );
   }
 
@@ -243,15 +166,12 @@ class _PokerGameScreenState extends ConsumerState<PokerGameScreen> {
       );
     }
 
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: PokerTableLayout(
-        table: table,
-        currentUserId: currentUserId,
-        onJoinSeat: (seatNumber) => _showJoinSeatDialog(seatNumber, table),
-        onPlayerAction: (action, {amount}) =>
-            _handlePlayerAction(action, amount: amount),
-      ),
+    return PokerTableLayout(
+      table: table,
+      currentUserId: currentUserId,
+      onJoinSeat: (seatNumber) => _showJoinSeatDialog(seatNumber, table),
+      onPlayerAction: (action, {amount}) =>
+          _handlePlayerAction(action, amount: amount),
     );
   }
 

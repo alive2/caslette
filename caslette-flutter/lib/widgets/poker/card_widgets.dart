@@ -30,19 +30,32 @@ class PlayingCard extends StatelessWidget {
           color: isRevealed && card != null
               ? Colors.white
               : const Color(0xFF1E40AF),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: isSelected
                 ? const Color(0xFF9333EA)
-                : const Color(0xFF374151),
+                : const Color(0xFF6B7280),
             width: isSelected ? 2 : 1,
           ),
           boxShadow: [
+            // Enhanced card shadows for 3D effect
+            BoxShadow(
+              color: Colors.black.withOpacity(0.4),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
             BoxShadow(
               color: Colors.black.withOpacity(0.2),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
+              blurRadius: 2,
+              offset: const Offset(0, 1),
             ),
+            // Subtle highlight on top
+            if (isRevealed && card != null)
+              BoxShadow(
+                color: Colors.white.withOpacity(0.3),
+                blurRadius: 1,
+                offset: const Offset(0, -1),
+              ),
           ],
         ),
         child: isRevealed && card != null
@@ -176,15 +189,35 @@ class CommunityCards extends StatelessWidget {
         break;
     }
 
-    return Container(
-      padding: const EdgeInsets.all(16),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 600),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF059669).withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFF059669).withOpacity(0.3),
-          width: 1,
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            const Color(0xFF047857).withOpacity(0.3),
+            const Color(0xFF059669).withOpacity(0.2),
+          ],
         ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFFFD700).withOpacity(0.6),
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFFD700).withOpacity(0.2),
+            blurRadius: 15,
+            offset: const Offset(0, 0),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         children: [
