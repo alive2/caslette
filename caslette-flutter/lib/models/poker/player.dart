@@ -52,8 +52,8 @@ class PokerPlayer {
 
   factory PokerPlayer.fromJson(Map<String, dynamic> json) {
     return PokerPlayer(
-      userId: json['user_id'] ?? '',
-      username: json['username'] ?? '',
+      userId: json['user_id']?.toString() ?? '',
+      username: json['username']?.toString() ?? '',
       seatNumber: json['seat_number'] ?? 0,
       chipCount: json['chip_count'] ?? 0,
       status: PlayerStatus.values.firstWhere(

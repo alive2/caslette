@@ -64,6 +64,8 @@ func (h *PokerHandler) CreateTable(c *gin.Context) {
 		return
 	}
 
+	// Note: Permission check is handled by middleware in main.go
+
 	// Validate business rules
 	if req.MaxBuyIn <= req.MinBuyIn {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Max buy-in must be greater than min buy-in"})
@@ -132,9 +134,9 @@ func (h *PokerHandler) ListTables(c *gin.Context) {
 	}
 
 	// Only show public tables unless user owns private tables
-	userID, exists := c.Get("user_id")
+	userID2, exists := c.Get("user_id")
 	if exists {
-		query = query.Where("is_private = false OR created_by = ?", userID.(uint))
+		query = query.Where("is_private = false OR created_by = ?", userID2.(uint))
 	} else {
 		query = query.Where("is_private = false")
 	}

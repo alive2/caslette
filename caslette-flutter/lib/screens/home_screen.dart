@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_provider.dart';
 import '../providers/diamond_provider.dart';
 import '../services/websocket_service.dart';
-import 'poker_table_list_screen.dart';
+import 'poker_connection_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -400,7 +400,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (context) => const PokerTableListScreen(),
+                        builder: (context) => const PokerConnectionScreen(),
                       ),
                     );
                   },

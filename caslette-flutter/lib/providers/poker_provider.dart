@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart';
 import '../models/poker/poker_models.dart';
 import '../services/poker_websocket_service.dart';
+import '../services/poker_api_service.dart';
 
 // Poker WebSocket Service Provider
 final pokerWebSocketServiceProvider =
@@ -62,6 +63,8 @@ class PokerNotifier extends StateNotifier<PokerState> {
   bool _isDisposed = false;
 
   PokerNotifier(this._webSocketService) : super(const PokerState()) {
+    // Initialize state with current websocket connection status
+    state = state.copyWith(isConnected: _webSocketService.isConnected);
     _initializeMessageListener();
     _webSocketService.addListener(_onConnectionChange);
   }
@@ -74,19 +77,11 @@ class PokerNotifier extends StateNotifier<PokerState> {
 
   void _onConnectionChange() {
     if (!_isDisposed) {
-      final wasConnected = state.isConnected;
       final isNowConnected = _webSocketService.isConnected;
-
       state = state.copyWith(isConnected: isNowConnected);
 
-      // Auto-request table list when connection is established
-      if (!wasConnected && isNowConnected) {
-        Future.delayed(const Duration(milliseconds: 200), () {
-          if (!_isDisposed && _webSocketService.isConnected) {
-            requestTableList();
-          }
-        });
-      }
+      // Note: Auto-request disabled - we now use HTTP API for table loading
+      // The websocket is only used for game functionality (create/join tables, etc.)
     }
   }
 
@@ -97,7 +92,8 @@ class PokerNotifier extends StateNotifier<PokerState> {
     try {
       await _webSocketService.connect(token);
       if (!_isDisposed) {
-        state = state.copyWith(isLoading: false, isConnected: true);
+        // Only clear loading state, connection state will be updated by _onConnectionChange
+        state = state.copyWith(isLoading: false);
       }
     } catch (e) {
       if (!_isDisposed) {
@@ -118,18 +114,54 @@ class PokerNotifier extends StateNotifier<PokerState> {
     }
   }
 
-  // Request list of available tables
+  // Request list of available tables via HTTP API
+  Future<void> fetchTablesViaAPI(String token) async {
+    if (_isDisposed) return;
+
+    print('DEBUG: fetchTablesViaAPI called');
+    state = state.copyWith(isLoading: true, error: null);
+
+    try {
+      final tables = await PokerApiService.fetchTables(token);
+
+      if (!_isDisposed) {
+        state = state.copyWith(
+          availableTables: tables,
+          isLoading: false,
+          error: null,
+        );
+        print('DEBUG: Successfully loaded ${tables.length} tables via API');
+      }
+    } catch (e) {
+      if (!_isDisposed) {
+        print('DEBUG: Error fetching tables via API: $e');
+        state = state.setError('Failed to load tables: ${e.toString()}');
+      }
+    }
+  }
+
+  // Request list of available tables via WebSocket (legacy method)
   void requestTableList() {
     if (_isDisposed) return;
 
+    print('DEBUG: requestTableList called (WebSocket)');
+
     // Check if WebSocket is connected
     if (!_webSocketService.isConnected) {
+      print('DEBUG: WebSocket not connected when requesting table list');
       state = state.setError('Not connected to poker server');
       return;
     }
 
+    print('DEBUG: WebSocket connected, requesting table list...');
     state = state.copyWith(isLoading: true, error: null);
     _webSocketService.requestTableList();
+  }
+
+  // Set loading state manually
+  void setLoading(bool loading) {
+    if (_isDisposed) return;
+    state = state.copyWith(isLoading: loading, error: null);
   }
 
   // Join a poker table
@@ -147,6 +179,34 @@ class PokerNotifier extends StateNotifier<PokerState> {
         state = state.copyWith(currentTable: null, currentTableId: null);
       }
     }
+  }
+
+  // Create a new poker table
+  void createTable({
+    required String name,
+    required int minBuyIn,
+    required int maxBuyIn,
+    required int smallBlind,
+    required int bigBlind,
+    required int maxPlayers,
+  }) {
+    if (_isDisposed) return;
+
+    // Check if WebSocket is connected
+    if (!_webSocketService.isConnected) {
+      state = state.setError('Not connected to poker server');
+      return;
+    }
+
+    state = state.copyWith(isLoading: true, error: null);
+    _webSocketService.createTable(
+      name: name,
+      minBuyIn: minBuyIn,
+      maxBuyIn: maxBuyIn,
+      smallBlind: smallBlind,
+      bigBlind: bigBlind,
+      maxPlayers: maxPlayers,
+    );
   }
 
   // Perform player action

@@ -32,6 +32,7 @@ func main() {
 	diamondHandler := handlers.NewDiamondHandler(cfg.DB)
 	roleHandler := handlers.NewRoleHandler(cfg.DB)
 	permissionHandler := handlers.NewPermissionHandler(cfg.DB)
+	pokerHandler := handlers.NewPokerHandler(cfg.DB)
 	wsHandler := websocket.NewWebSocketHandler(hub, cfg.DB, authService)
 
 	// Setup Gin router
@@ -104,6 +105,16 @@ func main() {
 				diamonds.POST("/credit", diamondHandler.AddDiamonds)
 				diamonds.POST("/debit", diamondHandler.DeductDiamonds)
 				diamonds.GET("/transactions", diamondHandler.GetAllTransactions)
+			}
+
+			// Poker routes
+			poker := protected.Group("/poker")
+			{
+				poker.GET("/tables", pokerHandler.ListTables)
+				poker.GET("/tables/:id", pokerHandler.GetTable)
+				poker.POST("/tables", middleware.PermissionMiddleware(cfg.DB, "poker.table.create"), pokerHandler.CreateTable)
+				poker.POST("/tables/:id/join", pokerHandler.JoinTable)
+				poker.POST("/tables/:id/leave", pokerHandler.LeaveTable)
 			}
 		}
 	}

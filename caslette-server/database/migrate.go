@@ -116,6 +116,8 @@ func seedDefaultData(db *gorm.DB) {
 		{Name: "diamond.credit", Description: "Credit diamonds to users", Resource: "diamonds", Action: "credit"},
 		{Name: "diamond.debit", Description: "Debit diamonds from users", Resource: "diamonds", Action: "debit"},
 		{Name: "admin.access", Description: "Access admin dashboard", Resource: "admin", Action: "access"},
+		{Name: "poker.table.create", Description: "Create poker tables", Resource: "poker", Action: "table_create"},
+		{Name: "poker.table.delete", Description: "Delete poker tables", Resource: "poker", Action: "table_delete"},
 	}
 
 	for _, permission := range permissions {
@@ -145,7 +147,7 @@ func seedDefaultData(db *gorm.DB) {
 	// Assign moderate permissions to moderator role
 	var moderatorPermissions []models.Permission
 	db.Where("name IN ?", []string{
-		"user.read", "user.update", "diamond.read", "diamond.credit", "diamond.debit", "admin.access",
+		"user.read", "user.update", "diamond.read", "diamond.credit", "diamond.debit", "admin.access", "poker.table.create",
 	}).Find(&moderatorPermissions)
 	db.Model(&moderatorRole).Association("Permissions").Replace(moderatorPermissions)
 

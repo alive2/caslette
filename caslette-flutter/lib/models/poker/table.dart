@@ -108,8 +108,8 @@ class PokerTable {
 
   factory PokerTable.fromJson(Map<String, dynamic> json) {
     return PokerTable(
-      id: json['id'] ?? '',
-      name: json['name'] ?? '',
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
       maxPlayers: json['max_players'] ?? 8,
       currentPlayers: json['current_players'] ?? 0,
       smallBlind: json['small_blind'] ?? 1,
@@ -136,7 +136,7 @@ class PokerTable {
           [],
       pot: json['pot'] ?? 0,
       currentBet: json['current_bet'] ?? 0,
-      currentPlayerUserId: json['current_player_user_id'],
+      currentPlayerUserId: json['current_player_user_id']?.toString(),
       handNumber: json['hand_number'] ?? 0,
       metadata: json['metadata'] ?? {},
     );

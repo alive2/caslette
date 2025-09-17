@@ -10,6 +10,7 @@ enum PokerMessageType {
   playerAction,
   gameState,
   tableList,
+  createTable,
   tableCreated,
   tableJoined,
   tableLeft,
@@ -33,6 +34,8 @@ enum PokerMessageType {
         return PokerMessageType.gameState;
       case 'poker_list_tables':
         return PokerMessageType.tableList;
+      case 'poker_create_table':
+        return PokerMessageType.createTable;
       case 'poker_table_created':
         return PokerMessageType.tableCreated;
       case 'poker_table_joined':
@@ -69,6 +72,8 @@ enum PokerMessageType {
         return 'poker_get_game_state';
       case PokerMessageType.tableList:
         return 'poker_list_tables';
+      case PokerMessageType.createTable:
+        return 'poker_create_table';
       case PokerMessageType.tableCreated:
         return 'poker_table_created';
       case PokerMessageType.tableJoined:
@@ -138,10 +143,13 @@ class PokerWebSocketService extends ChangeNotifier {
   // Connect to poker WebSocket
   Future<void> connect(String token) async {
     if (_isConnected || _isDisposed) {
-      debugPrint('Poker WebSocket already connected or disposed');
+      debugPrint(
+        'Poker WebSocket already connected or disposed - isConnected: $_isConnected, isDisposed: $_isDisposed',
+      );
       return;
     }
 
+    debugPrint('Starting poker WebSocket connection...');
     try {
       _token = token;
       final uri = Uri.parse('ws://localhost:8080/api/v1/ws?token=$token');
@@ -155,11 +163,13 @@ class PokerWebSocketService extends ChangeNotifier {
       );
 
       // Wait for the first message to confirm connection is ready
+      debugPrint('Waiting for WebSocket to be ready...');
       await _channel!.ready;
 
       _isConnected = true;
-      debugPrint('Poker WebSocket connected');
+      debugPrint('Poker WebSocket connected successfully');
       if (!_isDisposed) {
+        debugPrint('Notifying listeners of connection change...');
         notifyListeners();
       }
     } catch (e) {
@@ -208,6 +218,35 @@ class PokerWebSocketService extends ChangeNotifier {
   // Request list of available tables
   void requestTableList() {
     sendMessage(const PokerMessage(type: PokerMessageType.tableList));
+  }
+
+  // Create a new poker table
+  void createTable({
+    required String name,
+    required int minBuyIn,
+    required int maxBuyIn,
+    required int smallBlind,
+    required int bigBlind,
+    required int maxPlayers,
+  }) {
+    sendMessage(
+      PokerMessage(
+        type: PokerMessageType.createTable,
+        data: {
+          'name': name,
+          'min_buy_in': minBuyIn,
+          'max_buy_in': maxBuyIn,
+          'small_blind': smallBlind,
+          'big_blind': bigBlind,
+          'max_players': maxPlayers,
+          'game_type': 'texas_holdem',
+          'rake_percent': 0.05,
+          'max_rake': 50,
+          'is_private': false,
+          'password': '',
+        },
+      ),
+    );
   }
 
   // Join a poker table
