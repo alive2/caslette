@@ -137,7 +137,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               Icons.developer_mode,
               color: Colors.white.withOpacity(0.8),
             ),
-            tooltip: 'Socket.IO Test',
+            tooltip: 'Websocket Test',
           ),
           IconButton(
             onPressed: () {

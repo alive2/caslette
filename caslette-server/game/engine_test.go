@@ -369,6 +369,29 @@ func (m *MockGameEngine) GetWinners() []*Player {
 	return m.winners
 }
 
+// GetPublicGameState returns mock public game state
+func (m *MockGameEngine) GetPublicGameState() map[string]interface{} {
+	return map[string]interface{}{
+		"game_id": m.gameID,
+		"state":   m.state,
+		"players": len(m.players),
+	}
+}
+
+// GetPlayerState returns mock player state
+func (m *MockGameEngine) GetPlayerState(playerID string) map[string]interface{} {
+	player, err := m.GetPlayer(playerID)
+	if err != nil || player == nil {
+		return nil
+	}
+	
+	return map[string]interface{}{
+		"player_id": playerID,
+		"position":  player.Position,
+		"hand":      []string{}, // Mock empty hand
+	}
+}
+
 func TestMockGameEngine(t *testing.T) {
 	t.Run("ProcessValidAction", func(t *testing.T) {
 		engine := NewMockGameEngine("test-game")

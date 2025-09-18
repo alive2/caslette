@@ -1136,3 +1136,54 @@ func validateDataStructureRecursive(data interface{}, depth, maxDepth int, visit
 
 	return nil
 }
+
+// SetSmallBlind sets the small blind amount for the engine
+func (the *TexasHoldemEngine) SetSmallBlind(amount int) {
+	the.smallBlind = amount
+}
+
+// SetBigBlind sets the big blind amount for the engine
+func (the *TexasHoldemEngine) SetBigBlind(amount int) {
+	the.bigBlind = amount
+}
+
+// GetPublicGameState returns public game state (community cards, pot, etc.)
+func (the *TexasHoldemEngine) GetPublicGameState() map[string]interface{} {
+	currentPlayerID := ""
+	activePlayers := the.getActivePlayers()
+	if len(activePlayers) > 0 && the.actionPos < len(activePlayers) {
+		currentPlayerID = activePlayers[the.actionPos].ID
+	}
+	
+	return map[string]interface{}{
+		"pot":            the.pot,
+		"community_cards": the.communityCards,
+		"current_player": currentPlayerID,
+		"round_state":    the.roundState,
+		"dealer_position": the.dealerPos,
+		"small_blind":    the.smallBlind,
+		"big_blind":      the.bigBlind,
+	}
+}
+
+// GetPlayerState returns private state for a specific player
+func (the *TexasHoldemEngine) GetPlayerState(playerID string) map[string]interface{} {
+	player, err := the.GetPlayer(playerID)
+	if err != nil || player == nil {
+		return nil
+	}
+	
+	holdemPlayer := the.getHoldemPlayer(playerID)
+	if holdemPlayer == nil {
+		return nil
+	}
+	
+	return map[string]interface{}{
+		"hand":           holdemPlayer.Hand,
+		"chips":          holdemPlayer.Chips,
+		"current_bet":    holdemPlayer.CurrentBet,
+		"is_folded":      holdemPlayer.HasFolded,
+		"is_all_in":      holdemPlayer.IsAllIn,
+		"position":       player.Position,
+	}
+}
