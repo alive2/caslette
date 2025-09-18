@@ -37,6 +37,8 @@ type Client struct {
 	user     *models.User
 	userID   uint
 	username string
+	closed   bool
+	mu       sync.RWMutex
 }
 
 // Implement poker.Client interface for Client
@@ -71,7 +73,25 @@ func (c *Client) SendSuccess(messageType string, data interface{}) {
 }
 
 func (c *Client) SendMessage(msg poker.PokerMessage) {
+	c.mu.RLock()
+	if c.closed || c.conn == nil {
+		c.mu.RUnlock()
+		return
+	}
+	c.mu.RUnlock()
+
 	data, _ := json.Marshal(msg)
+
+	// Use defer and recover to handle panic from sending on closed channel
+	defer func() {
+		if r := recover(); r != nil {
+			// Channel was closed, mark client as closed
+			c.mu.Lock()
+			c.closed = true
+			c.mu.Unlock()
+		}
+	}()
+
 	select {
 	case c.send <- data:
 	default:
@@ -84,12 +104,20 @@ func (c *Client) GetConnection() interface{} {
 }
 
 func (c *Client) IsConnected() bool {
-	return c.conn != nil
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.conn != nil && !c.closed
 }
 
 func (c *Client) Close() {
-	if c.conn != nil {
-		c.conn.Close()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if !c.closed {
+		c.closed = true
+		if c.conn != nil {
+			c.conn.Close()
+		}
 	}
 }
 
@@ -142,6 +170,11 @@ func (h *Hub) Run() {
 			select {
 			case client.send <- data:
 			default:
+				// Mark client as closed before closing channel
+				client.mu.Lock()
+				client.closed = true
+				client.mu.Unlock()
+
 				close(client.send)
 				delete(h.clients, client)
 			}
@@ -150,6 +183,12 @@ func (h *Hub) Run() {
 			h.mu.Lock()
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
+
+				// Mark client as closed before closing channel
+				client.mu.Lock()
+				client.closed = true
+				client.mu.Unlock()
+
 				close(client.send)
 				log.Printf("User %s disconnected from WebSocket", client.username)
 
@@ -166,6 +205,11 @@ func (h *Hub) Run() {
 				select {
 				case client.send <- message:
 				default:
+					// Mark client as closed before closing channel
+					client.mu.Lock()
+					client.closed = true
+					client.mu.Unlock()
+
 					close(client.send)
 					delete(h.clients, client)
 				}

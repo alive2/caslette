@@ -163,6 +163,15 @@ class PlayerSeat extends StatelessWidget {
                   const Color(0xFF9333EA).withOpacity(0.3),
                 ],
               )
+            : isMyPlayer
+            ? LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  const Color(0xFF059669).withOpacity(0.3),
+                  const Color(0xFF047857).withOpacity(0.4),
+                ],
+              )
             : LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -172,8 +181,10 @@ class PlayerSeat extends StatelessWidget {
         border: Border.all(
           color: isCurrentPlayer
               ? const Color(0xFF7C3AED)
+              : isMyPlayer
+              ? const Color(0xFF059669)
               : const Color(0xFF4B5563),
-          width: isCurrentPlayer ? 2.5 : 1.5,
+          width: isCurrentPlayer || isMyPlayer ? 2.5 : 1.5,
         ),
         boxShadow: isCurrentPlayer
             ? [
@@ -187,6 +198,20 @@ class PlayerSeat extends StatelessWidget {
                   color: Colors.black.withOpacity(0.3),
                   blurRadius: 6,
                   offset: const Offset(0, 3),
+                ),
+              ]
+            : isMyPlayer
+            ? [
+                BoxShadow(
+                  color: const Color(0xFF059669).withOpacity(0.4),
+                  blurRadius: 8,
+                  spreadRadius: 1,
+                  offset: const Offset(0, 0),
+                ),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
                 ),
               ]
             : [

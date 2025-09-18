@@ -237,7 +237,7 @@ class _PokerGameScreenState extends ConsumerState<PokerGameScreen> {
                   buyInAmount <= table.maxBuyIn) {
                 ref
                     .read(pokerProvider.notifier)
-                    .joinTable(table.id, seatNumber, buyInAmount);
+                    .joinTable(table.id, buyInAmount);
                 setState(() {
                   _hasJoinedTable = true;
                 });

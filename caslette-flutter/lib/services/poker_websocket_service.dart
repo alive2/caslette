@@ -250,12 +250,15 @@ class PokerWebSocketService extends ChangeNotifier {
   }
 
   // Join a poker table
-  void joinTable(String tableId, int seatNumber, int buyInAmount) {
+  void joinTable(String tableId, int buyInAmount) {
     sendMessage(
       PokerMessage(
         type: PokerMessageType.joinTable,
-        tableId: tableId,
-        data: {'seat_number': seatNumber, 'buy_in_amount': buyInAmount},
+        data: {
+          'table_id': int.parse(tableId), // Server expects uint
+          'buy_in_amount': buyInAmount,
+          'password': '', // Empty password for public tables
+        },
       ),
     );
   }
@@ -281,7 +284,12 @@ class PokerWebSocketService extends ChangeNotifier {
   // Request current game state
   void requestGameState(String tableId) {
     sendMessage(
-      PokerMessage(type: PokerMessageType.gameState, tableId: tableId),
+      PokerMessage(
+        type: PokerMessageType.gameState,
+        data: {
+          'table_id': int.parse(tableId), // Server expects uint in data field
+        },
+      ),
     );
   }
 

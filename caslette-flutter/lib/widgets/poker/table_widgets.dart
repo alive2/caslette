@@ -240,8 +240,18 @@ class PokerTableLayout extends StatelessWidget {
           .where((p) => p.seatNumber == seatNumber)
           .firstOrNull;
       final isEmpty = player == null;
+
+      // Check if current user is already seated at this table
+      final isUserAlreadySeated =
+          currentUserId != null &&
+          table.players.any((p) => p.userId == currentUserId);
+
       final canJoin =
-          isEmpty && table.hasAvailableSeats && currentUserId != null;
+          isEmpty &&
+          table.hasAvailableSeats &&
+          currentUserId != null &&
+          !isUserAlreadySeated; // Don't allow joining if already seated
+
       final isCurrentPlayer = player?.userId == table.currentPlayerUserId;
 
       seats.add(

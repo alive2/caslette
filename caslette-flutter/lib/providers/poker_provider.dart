@@ -61,6 +61,8 @@ class PokerNotifier extends StateNotifier<PokerState> {
   final PokerWebSocketService _webSocketService;
   late final StreamSubscription _messageSubscription;
   bool _isDisposed = false;
+  Timer? _joinTimeoutTimer;
+  DateTime? _lastSuccessfulJoin;
 
   PokerNotifier(this._webSocketService) : super(const PokerState()) {
     // Initialize state with current websocket connection status
@@ -175,10 +177,29 @@ class PokerNotifier extends StateNotifier<PokerState> {
   }
 
   // Join a poker table
-  void joinTable(String tableId, int seatNumber, int buyInAmount) {
+  void joinTable(String tableId, int buyInAmount) {
     if (_isDisposed) return;
-    state = state.copyWith(isLoading: true, error: null);
-    _webSocketService.joinTable(tableId, seatNumber, buyInAmount);
+
+    // Clear any existing timeout
+    _joinTimeoutTimer?.cancel();
+
+    // Set the current table ID immediately when joining
+    state = state.copyWith(
+      isLoading: true,
+      error: null,
+      currentTableId: tableId,
+    );
+
+    // Set a timeout to prevent infinite loading
+    _joinTimeoutTimer = Timer(const Duration(seconds: 10), () {
+      if (!_isDisposed && state.isLoading) {
+        state = state.setError(
+          'Join table request timed out. Please try again.',
+        );
+      }
+    });
+
+    _webSocketService.joinTable(tableId, buyInAmount);
   }
 
   // Leave current table
@@ -246,6 +267,7 @@ class PokerNotifier extends StateNotifier<PokerState> {
       case PokerMessageType.tableList:
         _handleTableList(message);
         break;
+      case PokerMessageType.joinTable:
       case PokerMessageType.tableJoined:
         _handleTableJoined(message);
         break;
@@ -298,10 +320,26 @@ class PokerNotifier extends StateNotifier<PokerState> {
 
   void _handleTableJoined(PokerMessage message) {
     if (_isDisposed) return;
+
+    // Clear join timeout since we received a successful response
+    _joinTimeoutTimer?.cancel();
+
     try {
-      final tableData = message.data['table'];
-      if (tableData != null) {
-        final table = PokerTable.fromJson(tableData);
+      // For join table success, the data has table info or join confirmation
+      if (message.data.containsKey('table_id')) {
+        // This is a join confirmation - request the full game state
+        requestGameState();
+
+        // Clear loading state and mark as joined
+        state = state.copyWith(isLoading: false, error: null);
+
+        // Track successful join to ignore immediate errors
+        _lastSuccessfulJoin = DateTime.now();
+
+        debugPrint('Successfully joined table: ${message.data['table_id']}');
+      } else if (message.data.containsKey('table')) {
+        // This is full table data
+        final table = PokerTable.fromJson(message.data['table']);
         state = state.copyWith(
           currentTable: table,
           currentTableId: table.id,
@@ -310,7 +348,10 @@ class PokerNotifier extends StateNotifier<PokerState> {
         );
       }
     } catch (e) {
-      state = state.setError('Failed to join table: ${e.toString()}');
+      debugPrint('Failed to parse table joined response: $e');
+      // Don't set error here - just request game state as fallback
+      requestGameState();
+      state = state.copyWith(isLoading: false);
     }
   }
 
@@ -321,17 +362,34 @@ class PokerNotifier extends StateNotifier<PokerState> {
 
   void _handleGameState(PokerMessage message) {
     if (_isDisposed) return;
+
+    // Clear join timeout since we received a response
+    _joinTimeoutTimer?.cancel();
+
     try {
       final tableData = message.data['table'];
       if (tableData != null) {
         final table = PokerTable.fromJson(tableData);
+
+        // If we have a matching table ID, this is our current table
+        final isCurrentTable = table.id == state.currentTableId;
+
         state = state.copyWith(
           currentTable: table,
+          currentTableId: table.id,
           isLoading: false,
           error: null,
         );
+
+        debugPrint(
+          'Updated game state for table: ${table.id}, isCurrentTable: $isCurrentTable',
+        );
+      } else {
+        // Clear loading state even if no table data
+        state = state.copyWith(isLoading: false);
       }
     } catch (e) {
+      debugPrint('Failed to parse game state: $e');
       state = state.setError('Failed to update game state: ${e.toString()}');
     }
   }
@@ -368,6 +426,17 @@ class PokerNotifier extends StateNotifier<PokerState> {
 
   void _handleError(PokerMessage message) {
     if (_isDisposed) return;
+
+    // Ignore errors that come within 2 seconds of a successful join
+    // This works around server-side post-join errors that don't affect the actual join
+    if (_lastSuccessfulJoin != null) {
+      final timeSinceJoin = DateTime.now().difference(_lastSuccessfulJoin!);
+      if (timeSinceJoin.inSeconds < 2) {
+        debugPrint('Ignoring error after successful join: ${message.error}');
+        return;
+      }
+    }
+
     state = state.setError(message.error ?? 'Unknown poker error');
   }
 
@@ -380,6 +449,7 @@ class PokerNotifier extends StateNotifier<PokerState> {
   @override
   void dispose() {
     _isDisposed = true;
+    _joinTimeoutTimer?.cancel();
     _messageSubscription.cancel();
     _webSocketService.removeListener(_onConnectionChange);
     // Don't dispose the WebSocket service directly since it's managed by Riverpod
