@@ -34,10 +34,10 @@ func NewTableWebSocketHandler(tableManager *TableManager, hub WebSocketHub) *Tab
 		tableManager: tableManager,
 		hub:          hub,
 	}
-	
+
 	// Register as webhook handler for table events
 	tableManager.AddWebhookHandler(handler)
-	
+
 	return handler
 }
 
@@ -54,15 +54,15 @@ type WebSocketMessage struct {
 // GetMessageHandlers returns all table-related message handlers
 func (h *TableWebSocketHandler) GetMessageHandlers() map[string]func(ctx context.Context, conn WebSocketConnection, msg *WebSocketMessage) *WebSocketMessage {
 	return map[string]func(ctx context.Context, conn WebSocketConnection, msg *WebSocketMessage) *WebSocketMessage{
-		"table_create":         h.handleCreateTable,
-		"table_join":          h.handleJoinTable,
-		"table_leave":         h.handleLeaveTable,
-		"table_list":          h.handleListTables,
-		"table_get":           h.handleGetTable,
-		"table_close":         h.handleCloseTable,
-		"table_set_ready":     h.handleSetReady,
-		"table_start_game":    h.handleStartGame,
-		"table_get_stats":     h.handleGetStats,
+		"table_create":     h.handleCreateTable,
+		"table_join":       h.handleJoinTable,
+		"table_leave":      h.handleLeaveTable,
+		"table_list":       h.handleListTables,
+		"table_get":        h.handleGetTable,
+		"table_close":      h.handleCloseTable,
+		"table_set_ready":  h.handleSetReady,
+		"table_start_game": h.handleStartGame,
+		"table_get_stats":  h.handleGetStats,
 	}
 }
 
@@ -72,17 +72,17 @@ func (h *TableWebSocketHandler) handleCreateTable(ctx context.Context, conn WebS
 	if err := h.parseMessageData(msg.Data, &req); err != nil {
 		return h.errorResponse(msg.RequestID, "INVALID_DATA", "Invalid request data: "+err.Error())
 	}
-	
+
 	// Set creator info from connection
 	req.CreatedBy = conn.GetUserID()
 	req.Username = conn.GetUsername()
-	
+
 	// Create table
 	table, err := h.tableManager.CreateTable(ctx, &req)
 	if err != nil {
 		return h.errorResponse(msg.RequestID, "CREATE_FAILED", err.Error())
 	}
-	
+
 	// Auto-join creator as player
 	joinReq := &TableJoinRequest{
 		TableID:  table.ID,
@@ -90,11 +90,11 @@ func (h *TableWebSocketHandler) handleCreateTable(ctx context.Context, conn WebS
 		Username: conn.GetUsername(),
 		Mode:     JoinModePlayer,
 	}
-	
+
 	if err := h.tableManager.JoinTable(ctx, joinReq); err != nil {
 		log.Printf("Failed to auto-join creator to table: %v", err)
 	}
-	
+
 	return h.successResponse(msg.RequestID, "table_created", table.GetDetailedInfo())
 }
 
@@ -104,24 +104,24 @@ func (h *TableWebSocketHandler) handleJoinTable(ctx context.Context, conn WebSoc
 	if err := h.parseMessageData(msg.Data, &req); err != nil {
 		return h.errorResponse(msg.RequestID, "INVALID_DATA", "Invalid request data: "+err.Error())
 	}
-	
+
 	// Set player info from connection
 	req.PlayerID = conn.GetUserID()
 	req.Username = conn.GetUsername()
-	
+
 	// Default to player mode if not specified
 	if req.Mode == "" {
 		req.Mode = JoinModePlayer
 	}
-	
+
 	// Join table
 	if err := h.tableManager.JoinTable(ctx, &req); err != nil {
 		return h.errorResponse(msg.RequestID, "JOIN_FAILED", err.Error())
 	}
-	
+
 	// Get updated table info
 	table, _ := h.tableManager.GetTable(req.TableID)
-	
+
 	return h.successResponse(msg.RequestID, "table_joined", map[string]interface{}{
 		"table": table.GetDetailedInfo(),
 		"mode":  req.Mode,
@@ -134,15 +134,15 @@ func (h *TableWebSocketHandler) handleLeaveTable(ctx context.Context, conn WebSo
 	if err := h.parseMessageData(msg.Data, &req); err != nil {
 		return h.errorResponse(msg.RequestID, "INVALID_DATA", "Invalid request data: "+err.Error())
 	}
-	
+
 	// Set player info from connection
 	req.PlayerID = conn.GetUserID()
-	
+
 	// Leave table
 	if err := h.tableManager.LeaveTable(ctx, &req); err != nil {
 		return h.errorResponse(msg.RequestID, "LEAVE_FAILED", err.Error())
 	}
-	
+
 	return h.successResponse(msg.RequestID, "table_left", map[string]interface{}{
 		"table_id": req.TableID,
 	})
@@ -157,16 +157,16 @@ func (h *TableWebSocketHandler) handleListTables(ctx context.Context, conn WebSo
 			filters = filterMap
 		}
 	}
-	
+
 	// Get tables
 	tables := h.tableManager.ListTables(filters)
-	
+
 	// Convert to public info
 	var tableList []map[string]interface{}
 	for _, table := range tables {
 		tableList = append(tableList, table.GetTableInfo())
 	}
-	
+
 	return h.successResponse(msg.RequestID, "table_list", tableList)
 }
 
@@ -178,13 +178,13 @@ func (h *TableWebSocketHandler) handleGetTable(ctx context.Context, conn WebSock
 	if err := h.parseMessageData(msg.Data, &req); err != nil {
 		return h.errorResponse(msg.RequestID, "INVALID_DATA", "Invalid request data: "+err.Error())
 	}
-	
+
 	// Get table
 	table, err := h.tableManager.GetTable(req.TableID)
 	if err != nil {
 		return h.errorResponse(msg.RequestID, "TABLE_NOT_FOUND", err.Error())
 	}
-	
+
 	// Return detailed info if player is at table, otherwise public info
 	playerID := conn.GetUserID()
 	var tableInfo map[string]interface{}
@@ -193,7 +193,7 @@ func (h *TableWebSocketHandler) handleGetTable(ctx context.Context, conn WebSock
 	} else {
 		tableInfo = table.GetTableInfo()
 	}
-	
+
 	return h.successResponse(msg.RequestID, "table_info", tableInfo)
 }
 
@@ -205,23 +205,23 @@ func (h *TableWebSocketHandler) handleCloseTable(ctx context.Context, conn WebSo
 	if err := h.parseMessageData(msg.Data, &req); err != nil {
 		return h.errorResponse(msg.RequestID, "INVALID_DATA", "Invalid request data: "+err.Error())
 	}
-	
+
 	// Get table to check permissions
 	table, err := h.tableManager.GetTable(req.TableID)
 	if err != nil {
 		return h.errorResponse(msg.RequestID, "TABLE_NOT_FOUND", err.Error())
 	}
-	
+
 	// Check if user can close table (creator only)
 	if table.CreatedBy != conn.GetUserID() {
 		return h.errorResponse(msg.RequestID, "NOT_AUTHORIZED", "Only table creator can close the table")
 	}
-	
+
 	// Close table
 	if err := h.tableManager.CloseTable(req.TableID); err != nil {
 		return h.errorResponse(msg.RequestID, "CLOSE_FAILED", err.Error())
 	}
-	
+
 	return h.successResponse(msg.RequestID, "table_closed", map[string]interface{}{
 		"table_id": req.TableID,
 	})
@@ -236,33 +236,33 @@ func (h *TableWebSocketHandler) handleSetReady(ctx context.Context, conn WebSock
 	if err := h.parseMessageData(msg.Data, &req); err != nil {
 		return h.errorResponse(msg.RequestID, "INVALID_DATA", "Invalid request data: "+err.Error())
 	}
-	
+
 	// Get table
 	table, err := h.tableManager.GetTable(req.TableID)
 	if err != nil {
 		return h.errorResponse(msg.RequestID, "TABLE_NOT_FOUND", err.Error())
 	}
-	
+
 	// Check if player is at table
 	playerID := conn.GetUserID()
 	position := table.GetPlayerPosition(playerID)
 	if position == -1 {
 		return h.errorResponse(msg.RequestID, "NOT_AT_TABLE", "Player is not at this table")
 	}
-	
+
 	// Update ready state
 	table.mutex.Lock()
 	table.PlayerSlots[position].IsReady = req.Ready
 	table.Touch()
 	table.mutex.Unlock()
-	
+
 	// Broadcast update to room
 	h.broadcastTableUpdate(table, "player_ready_changed", map[string]interface{}{
 		"player_id": playerID,
 		"position":  position,
 		"ready":     req.Ready,
 	})
-	
+
 	return h.successResponse(msg.RequestID, "ready_updated", map[string]interface{}{
 		"ready": req.Ready,
 	})
@@ -276,13 +276,13 @@ func (h *TableWebSocketHandler) handleStartGame(ctx context.Context, conn WebSoc
 	if err := h.parseMessageData(msg.Data, &req); err != nil {
 		return h.errorResponse(msg.RequestID, "INVALID_DATA", "Invalid request data: "+err.Error())
 	}
-	
+
 	// Get table
 	table, err := h.tableManager.GetTable(req.TableID)
 	if err != nil {
 		return h.errorResponse(msg.RequestID, "TABLE_NOT_FOUND", err.Error())
 	}
-	
+
 	// Check permissions (creator or all players ready)
 	playerID := conn.GetUserID()
 	if table.CreatedBy != playerID {
@@ -298,16 +298,16 @@ func (h *TableWebSocketHandler) handleStartGame(ctx context.Context, conn WebSoc
 			return h.errorResponse(msg.RequestID, "NOT_READY", "All players must be ready or you must be the table creator")
 		}
 	}
-	
+
 	// Try to start game
 	table.mutex.Lock()
 	err = h.tableManager.tryStartGame(table)
 	table.mutex.Unlock()
-	
+
 	if err != nil {
 		return h.errorResponse(msg.RequestID, "START_FAILED", err.Error())
 	}
-	
+
 	return h.successResponse(msg.RequestID, "game_started", map[string]interface{}{
 		"table_id": req.TableID,
 	})
@@ -379,13 +379,13 @@ func (h *TableWebSocketHandler) parseMessageData(data interface{}, target interf
 	if data == nil {
 		return nil
 	}
-	
+
 	// Convert to JSON and back to properly handle type conversion
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return err
 	}
-	
+
 	return json.Unmarshal(jsonData, target)
 }
 
@@ -417,7 +417,7 @@ func (h *TableWebSocketHandler) broadcastTableUpdate(table *GameTable, eventType
 			Data: data,
 			Room: table.RoomID,
 		}
-		
+
 		if err := h.hub.BroadcastToRoom(table.RoomID, msg); err != nil {
 			log.Printf("Failed to broadcast to room %s: %v", table.RoomID, err)
 		}

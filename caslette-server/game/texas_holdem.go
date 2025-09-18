@@ -1154,15 +1154,15 @@ func (the *TexasHoldemEngine) GetPublicGameState() map[string]interface{} {
 	if len(activePlayers) > 0 && the.actionPos < len(activePlayers) {
 		currentPlayerID = activePlayers[the.actionPos].ID
 	}
-	
+
 	return map[string]interface{}{
-		"pot":            the.pot,
+		"pot":             the.pot,
 		"community_cards": the.communityCards,
-		"current_player": currentPlayerID,
-		"round_state":    the.roundState,
+		"current_player":  currentPlayerID,
+		"round_state":     the.roundState,
 		"dealer_position": the.dealerPos,
-		"small_blind":    the.smallBlind,
-		"big_blind":      the.bigBlind,
+		"small_blind":     the.smallBlind,
+		"big_blind":       the.bigBlind,
 	}
 }
 
@@ -1172,18 +1172,18 @@ func (the *TexasHoldemEngine) GetPlayerState(playerID string) map[string]interfa
 	if err != nil || player == nil {
 		return nil
 	}
-	
+
 	holdemPlayer := the.getHoldemPlayer(playerID)
 	if holdemPlayer == nil {
 		return nil
 	}
-	
+
 	return map[string]interface{}{
-		"hand":           holdemPlayer.Hand,
-		"chips":          holdemPlayer.Chips,
-		"current_bet":    holdemPlayer.CurrentBet,
-		"is_folded":      holdemPlayer.HasFolded,
-		"is_all_in":      holdemPlayer.IsAllIn,
-		"position":       player.Position,
+		"hand":        holdemPlayer.Hand,
+		"chips":       holdemPlayer.Chips,
+		"current_bet": holdemPlayer.CurrentBet,
+		"is_folded":   holdemPlayer.HasFolded,
+		"is_all_in":   holdemPlayer.IsAllIn,
+		"position":    player.Position,
 	}
 }

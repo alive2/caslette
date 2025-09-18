@@ -13,13 +13,13 @@ import (
 func setupTableSystem() {
 	// Create websocket hub (assuming you have one)
 	hub := websocket_v2.NewHub()
-	
+
 	// Create table integration
 	tableIntegration := game.NewTableGameIntegration(hub)
-	
+
 	// Get the table manager for direct operations
 	tableManager := tableIntegration.GetTableManager()
-	
+
 	// Register table message handlers with the hub
 	tableHandlers := tableIntegration.GetMessageHandlers()
 	for messageType, handler := range tableHandlers {
@@ -31,12 +31,12 @@ func setupTableSystem() {
 				RequestID: msg.RequestID,
 				Data:      msg.Data,
 			}
-			
+
 			response := handler(ctx, tableConn, tableMsg)
 			if response == nil {
 				return nil
 			}
-			
+
 			return &websocket_v2.Message{
 				Type:      response.Type,
 				RequestID: response.RequestID,
@@ -46,10 +46,10 @@ func setupTableSystem() {
 			}
 		})
 	}
-	
+
 	// Example: Create a table programmatically
 	ctx := context.Background()
-	
+
 	createRequest := &game.TableCreateRequest{
 		Name:        "Texas Hold'em - High Stakes",
 		GameType:    game.GameTypeTexasHoldem,
@@ -59,25 +59,25 @@ func setupTableSystem() {
 		Description: "High stakes Texas Hold'em table",
 		Tags:        []string{"high-stakes", "texas-holdem"},
 	}
-	
+
 	table, err := tableManager.CreateTable(ctx, createRequest)
 	if err != nil {
 		log.Printf("Failed to create table: %v", err)
 		return
 	}
-	
+
 	log.Printf("Created table: %s (ID: %s)", table.Name, table.ID)
-	
+
 	// Example: List all tables
 	tables := tableManager.ListTables(map[string]interface{}{})
 	log.Printf("Total tables: %d", len(tables))
-	
+
 	for _, t := range tables {
 		info := t.GetTableInfo()
-		log.Printf("- %s: %d/%d players, Status: %s", 
+		log.Printf("- %s: %d/%d players, Status: %s",
 			info["name"], info["player_count"], info["max_players"], info["status"])
 	}
-	
+
 	// Example: Get statistics
 	stats := tableManager.GetStats()
 	log.Printf("Table statistics: %+v", stats)
@@ -188,7 +188,7 @@ API Integration:
 Database Models:
 - game_tables        - Table metadata
 - table_players      - Player assignments
-- table_observers    - Observer assignments  
+- table_observers    - Observer assignments
 - game_sessions      - Game history
 
 Features:

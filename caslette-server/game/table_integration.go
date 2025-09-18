@@ -12,11 +12,11 @@ func (f *TexasHoldemEngineFactory) CreateEngine(gameType GameType, settings Tabl
 	switch gameType {
 	case GameTypeTexasHoldem:
 		engine := NewTexasHoldemEngine("table_game")
-		
+
 		// Configure engine with table settings
 		engine.SetSmallBlind(settings.SmallBlind)
 		engine.SetBigBlind(settings.BigBlind)
-		
+
 		return engine, nil
 	default:
 		return nil, fmt.Errorf("unsupported game type: %s", gameType)
@@ -33,13 +33,13 @@ type TableGameIntegration struct {
 func NewTableGameIntegration(hub WebSocketHub) *TableGameIntegration {
 	// Create engine factory
 	engineFactory := &TexasHoldemEngineFactory{}
-	
+
 	// Create table manager
 	tableManager := NewTableManager(engineFactory)
-	
+
 	// Create websocket handler
 	wsHandler := NewTableWebSocketHandler(tableManager, hub)
-	
+
 	return &TableGameIntegration{
 		tableManager: tableManager,
 		wsHandler:    wsHandler,
@@ -68,13 +68,13 @@ func DefaultTableSettings() TableSettings {
 	return TableSettings{
 		SmallBlind:       10,
 		BigBlind:         20,
-		BuyIn:           1000,
-		MaxBuyIn:        2000,
-		AutoStart:       false,
-		TimeLimit:       30,
-		TournamentMode:  false,
+		BuyIn:            1000,
+		MaxBuyIn:         2000,
+		AutoStart:        false,
+		TimeLimit:        30,
+		TournamentMode:   false,
 		ObserversAllowed: true,
-		Private:         false,
+		Private:          false,
 	}
 }
 
@@ -83,13 +83,13 @@ func QuickGameSettings() TableSettings {
 	return TableSettings{
 		SmallBlind:       5,
 		BigBlind:         10,
-		BuyIn:           500,
-		MaxBuyIn:        1000,
-		AutoStart:       true,
-		TimeLimit:       20,
-		TournamentMode:  false,
+		BuyIn:            500,
+		MaxBuyIn:         1000,
+		AutoStart:        true,
+		TimeLimit:        20,
+		TournamentMode:   false,
 		ObserversAllowed: true,
-		Private:         false,
+		Private:          false,
 	}
 }
 
@@ -98,13 +98,13 @@ func TournamentSettings() TableSettings {
 	return TableSettings{
 		SmallBlind:       25,
 		BigBlind:         50,
-		BuyIn:           2000,
-		MaxBuyIn:        2000,
-		AutoStart:       false,
-		TimeLimit:       45,
-		TournamentMode:  true,
+		BuyIn:            2000,
+		MaxBuyIn:         2000,
+		AutoStart:        false,
+		TimeLimit:        45,
+		TournamentMode:   true,
 		ObserversAllowed: true,
-		Private:         false,
+		Private:          false,
 	}
 }
 

@@ -46,7 +46,7 @@ func (h *TableHandler) CreateTable(c *gin.Context) {
 	}
 
 	username, _ := c.Get("username")
-	
+
 	// Set creator info
 	req.CreatedBy = userID.(string)
 	req.Username = username.(string)
@@ -71,23 +71,23 @@ func (h *TableHandler) CreateTable(c *gin.Context) {
 func (h *TableHandler) GetTables(c *gin.Context) {
 	// Parse query parameters for filtering
 	filters := make(map[string]interface{})
-	
+
 	if gameType := c.Query("game_type"); gameType != "" {
 		filters["game_type"] = gameType
 	}
-	
+
 	if status := c.Query("status"); status != "" {
 		filters["status"] = status
 	}
-	
+
 	if createdBy := c.Query("created_by"); createdBy != "" {
 		filters["created_by"] = createdBy
 	}
-	
+
 	if hasSpace := c.Query("has_space"); hasSpace == "true" {
 		filters["has_space"] = true
 	}
-	
+
 	if observersAllowed := c.Query("observers_allowed"); observersAllowed == "true" {
 		filters["observers_allowed"] = true
 	}
@@ -111,7 +111,7 @@ func (h *TableHandler) GetTables(c *gin.Context) {
 // GetTable handles GET /api/tables/:id
 func (h *TableHandler) GetTable(c *gin.Context) {
 	tableID := c.Param("id")
-	
+
 	// Get table
 	table, err := h.tableManager.GetTable(tableID)
 	if err != nil {
@@ -125,7 +125,7 @@ func (h *TableHandler) GetTable(c *gin.Context) {
 	// Check if user is authenticated and at table for detailed info
 	userID, authenticated := c.Get("user_id")
 	var tableInfo map[string]interface{}
-	
+
 	if authenticated {
 		playerID := userID.(string)
 		if table.IsPlayerAtTable(playerID) || table.IsObserver(playerID) {
@@ -146,13 +146,13 @@ func (h *TableHandler) GetTable(c *gin.Context) {
 // JoinTable handles POST /api/tables/:id/join
 func (h *TableHandler) JoinTable(c *gin.Context) {
 	tableID := c.Param("id")
-	
+
 	var req struct {
 		Mode     string `json:"mode"`     // "player" or "observer"
 		Position int    `json:"position"` // optional specific position
 		Password string `json:"password"` // for private tables
 	}
-	
+
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
@@ -201,7 +201,7 @@ func (h *TableHandler) JoinTable(c *gin.Context) {
 				statusCode = http.StatusUnauthorized
 			}
 		}
-		
+
 		c.JSON(statusCode, gin.H{
 			"success": false,
 			"error":   err.Error(),
@@ -252,7 +252,7 @@ func (h *TableHandler) LeaveTable(c *gin.Context) {
 				statusCode = http.StatusConflict
 			}
 		}
-		
+
 		c.JSON(statusCode, gin.H{
 			"success": false,
 			"error":   err.Error(),
@@ -348,7 +348,7 @@ func (h *TableHandler) GetMyTables(c *gin.Context) {
 	// Get all tables and filter where user is playing/observing
 	allTables := h.tableManager.ListTables(map[string]interface{}{})
 	var joinedTables []*game.GameTable
-	
+
 	playerIDStr := userID.(string)
 	for _, table := range allTables {
 		if table.IsPlayerAtTable(playerIDStr) || table.IsObserver(playerIDStr) {

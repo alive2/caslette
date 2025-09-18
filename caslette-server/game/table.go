@@ -9,11 +9,11 @@ import (
 type TableStatus string
 
 const (
-	TableStatusWaiting  TableStatus = "waiting"   // Waiting for players
-	TableStatusActive   TableStatus = "active"    // Game in progress
-	TableStatusPaused   TableStatus = "paused"    // Game paused
-	TableStatusFinished TableStatus = "finished"  // Game completed
-	TableStatusClosed   TableStatus = "closed"    // Table closed
+	TableStatusWaiting  TableStatus = "waiting"  // Waiting for players
+	TableStatusActive   TableStatus = "active"   // Game in progress
+	TableStatusPaused   TableStatus = "paused"   // Game paused
+	TableStatusFinished TableStatus = "finished" // Game completed
+	TableStatusClosed   TableStatus = "closed"   // Table closed
 )
 
 // GameType represents the type of game being played
@@ -27,17 +27,17 @@ const (
 // TableSettings contains configurable settings for a table
 type TableSettings struct {
 	// Game-specific settings
-	SmallBlind    int  `json:"small_blind"`
-	BigBlind      int  `json:"big_blind"`
-	BuyIn         int  `json:"buy_in"`
-	MaxBuyIn      int  `json:"max_buy_in"`
-	AutoStart     bool `json:"auto_start"`     // Auto start when enough players join
-	TimeLimit     int  `json:"time_limit"`     // Turn time limit in seconds
+	SmallBlind     int  `json:"small_blind"`
+	BigBlind       int  `json:"big_blind"`
+	BuyIn          int  `json:"buy_in"`
+	MaxBuyIn       int  `json:"max_buy_in"`
+	AutoStart      bool `json:"auto_start"`      // Auto start when enough players join
+	TimeLimit      int  `json:"time_limit"`      // Turn time limit in seconds
 	TournamentMode bool `json:"tournament_mode"` // Tournament vs cash game
-	
+
 	// Table behavior
-	ObserversAllowed bool `json:"observers_allowed"` // Allow spectators
-	Private          bool `json:"private"`           // Requires invitation
+	ObserversAllowed bool   `json:"observers_allowed"`  // Allow spectators
+	Private          bool   `json:"private"`            // Requires invitation
 	Password         string `json:"password,omitempty"` // Password protection
 }
 
@@ -60,47 +60,47 @@ type TableObserver struct {
 // GameTable represents a game table where players can join and play
 type GameTable struct {
 	// Basic info
-	ID          string       `json:"id"`
-	Name        string       `json:"name"`
-	GameType    GameType     `json:"game_type"`
-	Status      TableStatus  `json:"status"`
-	CreatedBy   string       `json:"created_by"`
-	CreatedAt   time.Time    `json:"created_at"`
-	UpdatedAt   time.Time    `json:"updated_at"`
+	ID        string      `json:"id"`
+	Name      string      `json:"name"`
+	GameType  GameType    `json:"game_type"`
+	Status    TableStatus `json:"status"`
+	CreatedBy string      `json:"created_by"`
+	CreatedAt time.Time   `json:"created_at"`
+	UpdatedAt time.Time   `json:"updated_at"`
 
 	// Player management
-	MaxPlayers    int             `json:"max_players"`
-	MinPlayers    int             `json:"min_players"`
-	PlayerSlots   []PlayerSlot    `json:"player_slots"`
-	Observers     []TableObserver `json:"observers"`      // Observers watching the game
-	
+	MaxPlayers  int             `json:"max_players"`
+	MinPlayers  int             `json:"min_players"`
+	PlayerSlots []PlayerSlot    `json:"player_slots"`
+	Observers   []TableObserver `json:"observers"` // Observers watching the game
+
 	// Game state
-	GameEngine    GameEngine `json:"-"` // Don't serialize the engine
-	Settings      TableSettings       `json:"settings"`
-	RoomID        string             `json:"room_id"` // Associated websocket room
-	
+	GameEngine GameEngine    `json:"-"` // Don't serialize the engine
+	Settings   TableSettings `json:"settings"`
+	RoomID     string        `json:"room_id"` // Associated websocket room
+
 	// Metadata
-	Description   string `json:"description,omitempty"`
-	Tags          []string `json:"tags,omitempty"`
-	
+	Description string   `json:"description,omitempty"`
+	Tags        []string `json:"tags,omitempty"`
+
 	// Internal
-	mutex         sync.RWMutex `json:"-"`
+	mutex sync.RWMutex `json:"-"`
 }
 
 // NewGameTable creates a new game table
 func NewGameTable(id, name string, gameType GameType, createdBy string, settings TableSettings) *GameTable {
 	now := time.Now()
-	
+
 	// Determine max players based on game type
 	maxPlayers := 8 // Default for Texas Hold'em
 	minPlayers := 2
-	
+
 	switch gameType {
 	case GameTypeTexasHoldem:
 		maxPlayers = 8
 		minPlayers = 2
 	}
-	
+
 	// Initialize player slots
 	playerSlots := make([]PlayerSlot, maxPlayers)
 	for i := range playerSlots {
@@ -108,7 +108,7 @@ func NewGameTable(id, name string, gameType GameType, createdBy string, settings
 			Position: i,
 		}
 	}
-	
+
 	return &GameTable{
 		ID:          id,
 		Name:        name,
@@ -130,7 +130,7 @@ func NewGameTable(id, name string, gameType GameType, createdBy string, settings
 func (t *GameTable) GetPlayerCount() int {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
-	
+
 	count := 0
 	for _, slot := range t.PlayerSlots {
 		if slot.PlayerID != "" {
@@ -144,7 +144,7 @@ func (t *GameTable) GetPlayerCount() int {
 func (t *GameTable) GetObserverCount() int {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
-	
+
 	return len(t.Observers)
 }
 
@@ -157,7 +157,7 @@ func (t *GameTable) GetTotalCount() int {
 func (t *GameTable) IsPlayerAtTable(playerID string) bool {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
-	
+
 	for _, slot := range t.PlayerSlots {
 		if slot.PlayerID == playerID {
 			return true
@@ -170,7 +170,7 @@ func (t *GameTable) IsPlayerAtTable(playerID string) bool {
 func (t *GameTable) IsObserver(playerID string) bool {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
-	
+
 	for _, observer := range t.Observers {
 		if observer.PlayerID == playerID {
 			return true
@@ -183,7 +183,7 @@ func (t *GameTable) IsObserver(playerID string) bool {
 func (t *GameTable) GetPlayerPosition(playerID string) int {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
-	
+
 	for _, slot := range t.PlayerSlots {
 		if slot.PlayerID == playerID {
 			return slot.Position
@@ -196,17 +196,17 @@ func (t *GameTable) GetPlayerPosition(playerID string) int {
 func (t *GameTable) CanJoinAsPlayer(playerID string) bool {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
-	
+
 	// Check if table is in a joinable state
 	if t.Status != TableStatusWaiting && t.Status != TableStatusPaused {
 		return false
 	}
-	
+
 	// Check if player is already at table
 	if t.IsPlayerAtTable(playerID) {
 		return false
 	}
-	
+
 	// Check if there's an available slot
 	return t.GetPlayerCount() < t.MaxPlayers
 }
@@ -215,17 +215,17 @@ func (t *GameTable) CanJoinAsPlayer(playerID string) bool {
 func (t *GameTable) CanJoinAsObserver(playerID string) bool {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
-	
+
 	// Check if observers are allowed
 	if !t.Settings.ObserversAllowed {
 		return false
 	}
-	
+
 	// Check if table is closed
 	if t.Status == TableStatusClosed {
 		return false
 	}
-	
+
 	// Check if already observing or playing
 	return !t.IsPlayerAtTable(playerID) && !t.IsObserver(playerID)
 }
@@ -234,7 +234,7 @@ func (t *GameTable) CanJoinAsObserver(playerID string) bool {
 func (t *GameTable) GetAvailableSlots() []int {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
-	
+
 	var available []int
 	for _, slot := range t.PlayerSlots {
 		if slot.PlayerID == "" {
@@ -248,7 +248,7 @@ func (t *GameTable) GetAvailableSlots() []int {
 func (t *GameTable) GetTableInfo() map[string]interface{} {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
-	
+
 	return map[string]interface{}{
 		"id":             t.ID,
 		"name":           t.Name,
@@ -263,22 +263,22 @@ func (t *GameTable) GetTableInfo() map[string]interface{} {
 		"observer_count": t.GetObserverCount(),
 		"settings":       t.Settings,
 		"description":    t.Description,
-		"tags":          t.Tags,
-		"room_id":       t.RoomID,
+		"tags":           t.Tags,
+		"room_id":        t.RoomID,
 	}
 }
 
 // GetDetailedInfo returns detailed information including player slots (for players/observers)
 func (t *GameTable) GetDetailedInfo() map[string]interface{} {
 	info := t.GetTableInfo()
-	
+
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
-	
+
 	// Add detailed player information
 	info["player_slots"] = t.PlayerSlots
 	info["observers"] = t.Observers
-	
+
 	return info
 }
 
@@ -286,6 +286,6 @@ func (t *GameTable) GetDetailedInfo() map[string]interface{} {
 func (t *GameTable) Touch() {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
-	
+
 	t.UpdatedAt = time.Now()
 }

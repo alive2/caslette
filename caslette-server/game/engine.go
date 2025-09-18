@@ -67,7 +67,7 @@ type GameEngine interface {
 	// Action handling
 	ProcessAction(ctx context.Context, action *GameAction) (*GameEvent, error)
 	GetValidActions(playerID string) []string
-	
+
 	// Security methods for data filtering
 	GetPublicGameState() map[string]interface{}
 	GetPlayerState(playerID string) map[string]interface{}

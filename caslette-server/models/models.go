@@ -89,45 +89,45 @@ func generateTransactionID() string {
 
 // GameTable represents a persistent game table in the database
 type GameTable struct {
-	ID          string    `json:"id" gorm:"primaryKey"`
-	Name        string    `json:"name" gorm:"not null"`
-	GameType    string    `json:"game_type" gorm:"not null"`
-	Status      string    `json:"status" gorm:"not null;default:'waiting'"`
-	CreatedBy   uint      `json:"created_by" gorm:"not null"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-	DeletedAt   gorm.DeletedAt `json:"-" gorm:"index"`
-	
+	ID        string         `json:"id" gorm:"primaryKey"`
+	Name      string         `json:"name" gorm:"not null"`
+	GameType  string         `json:"game_type" gorm:"not null"`
+	Status    string         `json:"status" gorm:"not null;default:'waiting'"`
+	CreatedBy uint           `json:"created_by" gorm:"not null"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `json:"-" gorm:"index"`
+
 	// Table configuration
-	MaxPlayers       int    `json:"max_players" gorm:"not null;default:8"`
-	MinPlayers       int    `json:"min_players" gorm:"not null;default:2"`
-	Description      string `json:"description"`
-	Tags             string `json:"tags"` // JSON array stored as string
-	RoomID           string `json:"room_id"`
-	
+	MaxPlayers  int    `json:"max_players" gorm:"not null;default:8"`
+	MinPlayers  int    `json:"min_players" gorm:"not null;default:2"`
+	Description string `json:"description"`
+	Tags        string `json:"tags"` // JSON array stored as string
+	RoomID      string `json:"room_id"`
+
 	// Game settings (stored as JSON)
-	Settings         string `json:"settings"` // JSON object
-	
+	Settings string `json:"settings"` // JSON object
+
 	// Current state
-	CurrentPlayers   int    `json:"current_players" gorm:"default:0"`
-	CurrentObservers int    `json:"current_observers" gorm:"default:0"`
-	
+	CurrentPlayers   int `json:"current_players" gorm:"default:0"`
+	CurrentObservers int `json:"current_observers" gorm:"default:0"`
+
 	// Relationships
-	Creator         User              `json:"creator" gorm:"foreignKey:CreatedBy"`
-	TablePlayers    []TablePlayer     `json:"table_players" gorm:"foreignKey:TableID"`
-	TableObservers  []TableObserver   `json:"table_observers" gorm:"foreignKey:TableID"`
+	Creator        User            `json:"creator" gorm:"foreignKey:CreatedBy"`
+	TablePlayers   []TablePlayer   `json:"table_players" gorm:"foreignKey:TableID"`
+	TableObservers []TableObserver `json:"table_observers" gorm:"foreignKey:TableID"`
 }
 
 // TablePlayer represents a player at a specific table
 type TablePlayer struct {
-	ID       uint      `json:"id" gorm:"primaryKey"`
-	TableID  string    `json:"table_id" gorm:"not null"`
-	UserID   uint      `json:"user_id" gorm:"not null"`
-	Position int       `json:"position" gorm:"not null"`
-	IsReady  bool      `json:"is_ready" gorm:"default:false"`
-	JoinedAt time.Time `json:"joined_at"`
+	ID       uint       `json:"id" gorm:"primaryKey"`
+	TableID  string     `json:"table_id" gorm:"not null"`
+	UserID   uint       `json:"user_id" gorm:"not null"`
+	Position int        `json:"position" gorm:"not null"`
+	IsReady  bool       `json:"is_ready" gorm:"default:false"`
+	JoinedAt time.Time  `json:"joined_at"`
 	LeftAt   *time.Time `json:"left_at,omitempty"`
-	
+
 	// Relationships
 	Table GameTable `json:"-" gorm:"foreignKey:TableID"`
 	User  User      `json:"user" gorm:"foreignKey:UserID"`
@@ -135,12 +135,12 @@ type TablePlayer struct {
 
 // TableObserver represents an observer at a specific table
 type TableObserver struct {
-	ID       uint      `json:"id" gorm:"primaryKey"`
-	TableID  string    `json:"table_id" gorm:"not null"`
-	UserID   uint      `json:"user_id" gorm:"not null"`
-	JoinedAt time.Time `json:"joined_at"`
+	ID       uint       `json:"id" gorm:"primaryKey"`
+	TableID  string     `json:"table_id" gorm:"not null"`
+	UserID   uint       `json:"user_id" gorm:"not null"`
+	JoinedAt time.Time  `json:"joined_at"`
 	LeftAt   *time.Time `json:"left_at,omitempty"`
-	
+
 	// Relationships
 	Table GameTable `json:"-" gorm:"foreignKey:TableID"`
 	User  User      `json:"user" gorm:"foreignKey:UserID"`
@@ -148,12 +148,12 @@ type TableObserver struct {
 
 // GameSession represents a completed game session
 type GameSession struct {
-	ID        uint      `json:"id" gorm:"primaryKey"`
-	TableID   string    `json:"table_id" gorm:"not null"`
-	StartedAt time.Time `json:"started_at"`
+	ID        uint       `json:"id" gorm:"primaryKey"`
+	TableID   string     `json:"table_id" gorm:"not null"`
+	StartedAt time.Time  `json:"started_at"`
 	EndedAt   *time.Time `json:"ended_at,omitempty"`
-	GameData  string    `json:"game_data"` // JSON object with game state/results
-	
+	GameData  string     `json:"game_data"` // JSON object with game state/results
+
 	// Relationships
 	Table GameTable `json:"table" gorm:"foreignKey:TableID"`
 }

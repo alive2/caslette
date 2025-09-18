@@ -30,26 +30,26 @@ func (e *TableError) Error() string {
 
 // Common table error codes
 var (
-	ErrTableNotFound     = &TableError{"TABLE_NOT_FOUND", "Table not found"}
-	ErrTableFull         = &TableError{"TABLE_FULL", "Table is full"}
-	ErrPlayerNotAtTable  = &TableError{"PLAYER_NOT_AT_TABLE", "Player is not at this table"}
+	ErrTableNotFound        = &TableError{"TABLE_NOT_FOUND", "Table not found"}
+	ErrTableFull            = &TableError{"TABLE_FULL", "Table is full"}
+	ErrPlayerNotAtTable     = &TableError{"PLAYER_NOT_AT_TABLE", "Player is not at this table"}
 	ErrPlayerAlreadyAtTable = &TableError{"PLAYER_ALREADY_AT_TABLE", "Player is already at this table"}
-	ErrTableNotJoinable  = &TableError{"TABLE_NOT_JOINABLE", "Table is not in a joinable state"}
-	ErrObserversNotAllowed = &TableError{"OBSERVERS_NOT_ALLOWED", "Observers are not allowed at this table"}
-	ErrInvalidPosition   = &TableError{"INVALID_POSITION", "Invalid table position"}
-	ErrGameInProgress    = &TableError{"GAME_IN_PROGRESS", "Cannot perform action while game is in progress"}
-	ErrInvalidPassword   = &TableError{"INVALID_PASSWORD", "Invalid table password"}
-	ErrNotTableCreator   = &TableError{"NOT_TABLE_CREATOR", "Only table creator can perform this action"}
+	ErrTableNotJoinable     = &TableError{"TABLE_NOT_JOINABLE", "Table is not in a joinable state"}
+	ErrObserversNotAllowed  = &TableError{"OBSERVERS_NOT_ALLOWED", "Observers are not allowed at this table"}
+	ErrInvalidPosition      = &TableError{"INVALID_POSITION", "Invalid table position"}
+	ErrGameInProgress       = &TableError{"GAME_IN_PROGRESS", "Cannot perform action while game is in progress"}
+	ErrInvalidPassword      = &TableError{"INVALID_PASSWORD", "Invalid table password"}
+	ErrNotTableCreator      = &TableError{"NOT_TABLE_CREATOR", "Only table creator can perform this action"}
 )
 
 // TableJoinRequest represents a request to join a table
 type TableJoinRequest struct {
-	TableID    string        `json:"table_id"`
-	PlayerID   string        `json:"player_id"`
-	Username   string        `json:"username"`
-	Mode       TableJoinMode `json:"mode"`      // player or observer
-	Position   int          `json:"position,omitempty"` // specific position (optional)
-	Password   string       `json:"password,omitempty"` // for private tables
+	TableID  string        `json:"table_id"`
+	PlayerID string        `json:"player_id"`
+	Username string        `json:"username"`
+	Mode     TableJoinMode `json:"mode"`               // player or observer
+	Position int           `json:"position,omitempty"` // specific position (optional)
+	Password string        `json:"password,omitempty"` // for private tables
 }
 
 // TableLeaveRequest represents a request to leave a table
@@ -113,7 +113,7 @@ func NewTableManager(engineFactory GameEngineFactory) *TableManager {
 func (tm *TableManager) AddWebhookHandler(handler TableWebhookHandler) {
 	tm.mutex.Lock()
 	defer tm.mutex.Unlock()
-	
+
 	tm.webhookHandlers = append(tm.webhookHandlers, handler)
 }
 
@@ -130,28 +130,28 @@ func (tm *TableManager) CreateTable(ctx context.Context, req *TableCreateRequest
 	if err := tm.validator.ValidateTableCreateRequest(req); err != nil {
 		return nil, fmt.Errorf("validation failed: %w", err)
 	}
-	
+
 	// Check rate limits
 	if err := tm.rateLimiter.CanCreateTable(req.CreatedBy); err != nil {
 		return nil, err
 	}
-	
+
 	tm.mutex.Lock()
 	defer tm.mutex.Unlock()
-	
+
 	// Sanitize inputs
 	req.Name = tm.validator.SanitizeInput(req.Name)
 	req.Description = tm.validator.SanitizeInput(req.Description)
 	req.Settings.Password = tm.validator.SanitizeInput(req.Settings.Password)
-	
+
 	// Generate unique ID
 	tableID := tm.generateTableID()
-	
+
 	// Create table
 	table := NewGameTable(tableID, req.Name, req.GameType, req.CreatedBy, req.Settings)
 	table.Description = req.Description
 	table.Tags = req.Tags
-	
+
 	// Create game engine if factory is available
 	if tm.engineFactory != nil {
 		engine, err := tm.engineFactory.CreateEngine(req.GameType, req.Settings)
@@ -160,18 +160,18 @@ func (tm *TableManager) CreateTable(ctx context.Context, req *TableCreateRequest
 		}
 		table.GameEngine = engine
 	}
-	
+
 	// Store table
 	tm.tables[tableID] = table
-	
+
 	// Record table creation for rate limiting
 	tm.rateLimiter.RecordTableCreated(req.CreatedBy, tableID)
-	
+
 	// Notify webhook handlers
 	for _, handler := range tm.webhookHandlers {
 		go handler.OnTableCreated(table)
 	}
-	
+
 	return table, nil
 }
 
@@ -179,12 +179,12 @@ func (tm *TableManager) CreateTable(ctx context.Context, req *TableCreateRequest
 func (tm *TableManager) GetTable(tableID string) (*GameTable, error) {
 	tm.mutex.RLock()
 	defer tm.mutex.RUnlock()
-	
+
 	table, exists := tm.tables[tableID]
 	if !exists {
 		return nil, ErrTableNotFound
 	}
-	
+
 	return table, nil
 }
 
@@ -195,13 +195,13 @@ func (tm *TableManager) GetTableInfo(tableID string, requesterID string) (map[st
 		tm.auditor.LogAction(requesterID, tableID, "get_table_info", "failed", err.Error())
 		return nil, err
 	}
-	
+
 	// Validate access
 	if err := tm.dataFilter.ValidateTableAccess(table, requesterID, "view"); err != nil {
 		tm.auditor.LogAction(requesterID, tableID, "get_table_info", "access_denied", err.Error())
 		return nil, err
 	}
-	
+
 	tm.auditor.LogAction(requesterID, tableID, "get_table_info", "success", "")
 	return tm.dataFilter.FilterTableInfo(table, requesterID, ""), nil
 }
@@ -210,20 +210,20 @@ func (tm *TableManager) GetTableInfo(tableID string, requesterID string) (map[st
 func (tm *TableManager) ListTables(filters map[string]interface{}) []*GameTable {
 	tm.mutex.RLock()
 	defer tm.mutex.RUnlock()
-	
+
 	var result []*GameTable
-	
+
 	for _, table := range tm.tables {
 		if tm.matchesFilters(table, filters) {
 			result = append(result, table)
 		}
 	}
-	
+
 	// Sort by created time (newest first)
 	sort.Slice(result, func(i, j int) bool {
 		return result[i].CreatedAt.After(result[j].CreatedAt)
 	})
-	
+
 	return result
 }
 
@@ -234,31 +234,31 @@ func (tm *TableManager) matchesFilters(table *GameTable, filters map[string]inte
 			return false
 		}
 	}
-	
+
 	if status, ok := filters["status"]; ok {
 		if table.Status != TableStatus(status.(string)) {
 			return false
 		}
 	}
-	
+
 	if createdBy, ok := filters["created_by"]; ok {
 		if table.CreatedBy != createdBy.(string) {
 			return false
 		}
 	}
-	
+
 	if hasSpace, ok := filters["has_space"]; ok {
 		if hasSpace.(bool) && table.GetPlayerCount() >= table.MaxPlayers {
 			return false
 		}
 	}
-	
+
 	if observersAllowed, ok := filters["observers_allowed"]; ok {
 		if table.Settings.ObserversAllowed != observersAllowed.(bool) {
 			return false
 		}
 	}
-	
+
 	return true
 }
 
@@ -268,34 +268,34 @@ func (tm *TableManager) JoinTable(ctx context.Context, req *TableJoinRequest) er
 	if err := tm.validator.ValidateTableJoinRequest(req); err != nil {
 		return fmt.Errorf("validation failed: %w", err)
 	}
-	
+
 	// Check rate limits for joins
 	if err := tm.rateLimiter.CanJoinTable(req.PlayerID, req.TableID); err != nil {
 		return err
 	}
-	
+
 	// For observers, check observer-specific limits
 	if req.Mode == JoinModeObserver {
 		if err := tm.rateLimiter.CanObserveTable(req.PlayerID, req.TableID); err != nil {
 			return err
 		}
 	}
-	
+
 	table, err := tm.GetTable(req.TableID)
 	if err != nil {
 		return err
 	}
-	
+
 	table.mutex.Lock()
 	defer table.mutex.Unlock()
-	
+
 	// Check password for private tables
 	if table.Settings.Private && table.Settings.Password != "" {
 		if req.Password != table.Settings.Password {
 			return ErrInvalidPassword
 		}
 	}
-	
+
 	switch req.Mode {
 	case JoinModePlayer:
 		return tm.joinAsPlayer(table, req)
@@ -318,7 +318,7 @@ func (tm *TableManager) joinAsPlayer(table *GameTable, req *TableJoinRequest) er
 		}
 		return ErrTableNotJoinable
 	}
-	
+
 	// Find position
 	position := req.Position
 	if position == 0 { // Auto-assign position
@@ -336,7 +336,7 @@ func (tm *TableManager) joinAsPlayer(table *GameTable, req *TableJoinRequest) er
 			return &TableError{"POSITION_TAKEN", "Requested position is already taken"}
 		}
 	}
-	
+
 	// Add player to slot
 	table.PlayerSlots[position] = PlayerSlot{
 		Position: position,
@@ -345,22 +345,22 @@ func (tm *TableManager) joinAsPlayer(table *GameTable, req *TableJoinRequest) er
 		IsReady:  false,
 		JoinedAt: time.Now(),
 	}
-	
+
 	// Remove from observers if was observing
 	tm.removeObserver(table, req.PlayerID)
-	
+
 	table.Touch()
-	
+
 	// Notify webhook handlers
 	for _, handler := range tm.webhookHandlers {
 		go handler.OnPlayerJoined(table, req.PlayerID, req.Username, JoinModePlayer)
 	}
-	
+
 	// Check if game should auto-start
 	if table.Settings.AutoStart && table.GetPlayerCount() >= table.MinPlayers {
 		tm.tryStartGame(table)
 	}
-	
+
 	return nil
 }
 
@@ -376,7 +376,7 @@ func (tm *TableManager) joinAsObserver(table *GameTable, req *TableJoinRequest) 
 		}
 		return ErrTableNotJoinable
 	}
-	
+
 	// Add to observers
 	observer := TableObserver{
 		PlayerID: req.PlayerID,
@@ -385,15 +385,15 @@ func (tm *TableManager) joinAsObserver(table *GameTable, req *TableJoinRequest) 
 	}
 	table.Observers = append(table.Observers, observer)
 	table.Touch()
-	
+
 	// Record in rate limiter
 	tm.rateLimiter.RecordObserverJoined(req.PlayerID, req.TableID)
-	
+
 	// Notify webhook handlers
 	for _, handler := range tm.webhookHandlers {
 		go handler.OnPlayerJoined(table, req.PlayerID, req.Username, JoinModeObserver)
 	}
-	
+
 	return nil
 }
 
@@ -403,15 +403,15 @@ func (tm *TableManager) LeaveTable(ctx context.Context, req *TableLeaveRequest) 
 	if err != nil {
 		return err
 	}
-	
+
 	table.mutex.Lock()
 	defer table.mutex.Unlock()
-	
+
 	// Check if player is at table
 	if !table.IsPlayerAtTable(req.PlayerID) && !table.IsObserver(req.PlayerID) {
 		return ErrPlayerNotAtTable
 	}
-	
+
 	// Remove from player slots
 	var mode TableJoinMode
 	for i, slot := range table.PlayerSlots {
@@ -421,24 +421,24 @@ func (tm *TableManager) LeaveTable(ctx context.Context, req *TableLeaveRequest) 
 			break
 		}
 	}
-	
+
 	// Remove from observers
 	if mode == "" && tm.removeObserver(table, req.PlayerID) {
 		mode = JoinModeObserver
 	}
-	
+
 	table.Touch()
-	
+
 	// Notify webhook handlers
 	for _, handler := range tm.webhookHandlers {
 		go handler.OnPlayerLeft(table, req.PlayerID, mode)
 	}
-	
+
 	// Check if table should be closed (no players left)
 	if table.GetPlayerCount() == 0 && table.GetObserverCount() == 0 {
 		tm.closeTable(table)
 	}
-	
+
 	return nil
 }
 
@@ -458,11 +458,11 @@ func (tm *TableManager) tryStartGame(table *GameTable) error {
 	if table.Status != TableStatusWaiting {
 		return nil
 	}
-	
+
 	if table.GetPlayerCount() < table.MinPlayers {
 		return nil
 	}
-	
+
 	// Initialize game engine if available
 	if table.GameEngine != nil {
 		// Add players to game engine
@@ -481,21 +481,21 @@ func (tm *TableManager) tryStartGame(table *GameTable) error {
 				table.GameEngine.AddPlayer(player)
 			}
 		}
-		
+
 		// Start the game
 		if err := table.GameEngine.Start(); err != nil {
 			return fmt.Errorf("failed to start game: %w", err)
 		}
 	}
-	
+
 	table.Status = TableStatusActive
 	table.Touch()
-	
+
 	// Notify webhook handlers
 	for _, handler := range tm.webhookHandlers {
 		go handler.OnGameStarted(table)
 	}
-	
+
 	return nil
 }
 
@@ -503,12 +503,12 @@ func (tm *TableManager) tryStartGame(table *GameTable) error {
 func (tm *TableManager) CloseTable(tableID string) error {
 	tm.mutex.Lock()
 	defer tm.mutex.Unlock()
-	
+
 	table, exists := tm.tables[tableID]
 	if !exists {
 		return ErrTableNotFound
 	}
-	
+
 	tm.closeTable(table)
 	return nil
 }
@@ -517,12 +517,12 @@ func (tm *TableManager) CloseTable(tableID string) error {
 func (tm *TableManager) closeTable(table *GameTable) {
 	table.Status = TableStatusClosed
 	table.Touch()
-	
+
 	// Notify webhook handlers
 	for _, handler := range tm.webhookHandlers {
 		go handler.OnTableClosed(table)
 	}
-	
+
 	// Remove from tables map
 	delete(tm.tables, table.ID)
 }
@@ -531,7 +531,7 @@ func (tm *TableManager) closeTable(table *GameTable) {
 func (tm *TableManager) GetTableCount() int {
 	tm.mutex.RLock()
 	defer tm.mutex.RUnlock()
-	
+
 	return len(tm.tables)
 }
 
@@ -539,20 +539,20 @@ func (tm *TableManager) GetTableCount() int {
 func (tm *TableManager) GetStats() map[string]interface{} {
 	tm.mutex.RLock()
 	defer tm.mutex.RUnlock()
-	
+
 	totalTables := len(tm.tables)
 	totalPlayers := 0
 	totalObservers := 0
 	statusCounts := make(map[TableStatus]int)
 	gameTypeCounts := make(map[GameType]int)
-	
+
 	for _, table := range tm.tables {
 		totalPlayers += table.GetPlayerCount()
 		totalObservers += table.GetObserverCount()
 		statusCounts[table.Status]++
 		gameTypeCounts[table.GameType]++
 	}
-	
+
 	return map[string]interface{}{
 		"total_tables":     totalTables,
 		"total_players":    totalPlayers,

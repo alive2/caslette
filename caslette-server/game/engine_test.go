@@ -384,7 +384,7 @@ func (m *MockGameEngine) GetPlayerState(playerID string) map[string]interface{} 
 	if err != nil || player == nil {
 		return nil
 	}
-	
+
 	return map[string]interface{}{
 		"player_id": playerID,
 		"position":  player.Position,
