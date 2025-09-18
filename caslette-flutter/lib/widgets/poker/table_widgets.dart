@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/poker/poker_models.dart' as poker;
 import 'card_widgets.dart';
 import 'player_widgets.dart';
+import 'poker_table_background.dart';
 
 class PokerTableLayout extends StatelessWidget {
   final poker.PokerTable table;
@@ -22,16 +23,8 @@ class PokerTableLayout extends StatelessWidget {
     final screenSize = MediaQuery.of(context).size;
     final isLandscape = screenSize.width > screenSize.height;
 
-    return Container(
-      width: double.infinity,
-      height: double.infinity,
-      decoration: const BoxDecoration(
-        image: DecorationImage(
-          image: AssetImage('assets/images/poker_table_texture.png'),
-          fit: BoxFit.cover,
-          scale: 0.5,
-        ),
-      ),
+    return PokerTableBackground(
+      useGradientFallback: false, // Your landscape table image works well
       child: Padding(
         padding: EdgeInsets.all(isLandscape ? 12 : 8),
         child: Column(
@@ -69,11 +62,6 @@ class PokerTableLayout extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: Colors.transparent,
                   borderRadius: BorderRadius.circular(tableHeight / 2),
-                  // Optional: subtle border to define the table area
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.1),
-                    width: 2,
-                  ),
                 ),
               ),
             ),
@@ -94,47 +82,33 @@ class PokerTableLayout extends StatelessWidget {
 
                   const SizedBox(height: 16),
 
-                  // Enhanced pot with gaming effects
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 500),
-                    curve: Curves.elasticOut,
+                  // Modern pot display with subtle elegance
+                  Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
+                      horizontal: 24,
+                      vertical: 14,
                     ),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
                         colors: [
-                          const Color(0xFFFFD700).withOpacity(0.9), // Gold
-                          const Color(0xFFF59E0B).withOpacity(0.8), // Amber
-                          const Color(0xFFD97706).withOpacity(0.7), // Orange
+                          const Color(0xFFFBBF24), // Warm gold
+                          const Color(0xFFF59E0B), // Rich amber
                         ],
                       ),
-                      borderRadius: BorderRadius.circular(25),
-                      border: Border.all(
-                        color: const Color(0xFFFFD700),
-                        width: 3,
-                      ),
+                      borderRadius: BorderRadius.circular(20),
                       boxShadow: [
-                        // Outer glow effect
+                        // Main shadow for depth
                         BoxShadow(
-                          color: const Color(0xFFFFD700).withOpacity(0.6),
-                          blurRadius: 20,
-                          spreadRadius: 3,
-                          offset: const Offset(0, 0),
+                          color: Colors.black.withOpacity(0.25),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
                         ),
-                        // Main shadow
+                        // Subtle inner highlight
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.3),
-                          blurRadius: 12,
-                          offset: const Offset(0, 6),
-                        ),
-                        // Inner highlight
-                        BoxShadow(
-                          color: Colors.white.withOpacity(0.3),
-                          blurRadius: 3,
+                          color: Colors.white.withOpacity(0.2),
+                          blurRadius: 1,
                           offset: const Offset(0, -1),
                         ),
                       ],
@@ -142,38 +116,31 @@ class PokerTableLayout extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Enhanced diamond with glow
+                        // Elegant diamond icon
                         Container(
-                          padding: const EdgeInsets.all(6),
+                          padding: const EdgeInsets.all(4),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(10),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFFFFD700).withOpacity(0.5),
-                                blurRadius: 8,
-                                offset: const Offset(0, 0),
-                              ),
-                            ],
+                            color: Colors.white.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(8),
                           ),
                           child: const Icon(
                             Icons.diamond,
                             color: Colors.white,
-                            size: 22,
+                            size: 18,
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 10),
                         Text(
                           'POT: ${table.pot}',
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1.2,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
                             shadows: [
                               Shadow(
                                 color: Colors.black,
-                                offset: Offset(1, 1),
+                                offset: Offset(0, 1),
                                 blurRadius: 2,
                               ),
                             ],
@@ -183,38 +150,33 @@ class PokerTableLayout extends StatelessWidget {
                     ),
                   ),
 
-                  // Enhanced betting round indicator
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 400),
-                    margin: const EdgeInsets.only(top: 12),
+                  // Modern betting round indicator
+                  Container(
+                    margin: const EdgeInsets.only(top: 16),
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
+                      horizontal: 20,
+                      vertical: 10,
                     ),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
                         colors: [
-                          const Color(0xFF7C3AED).withOpacity(0.8),
-                          const Color(0xFF9333EA).withOpacity(0.7),
+                          const Color(0xFF8B5CF6), // Lighter purple
+                          const Color(0xFF7C3AED), // Rich purple
                         ],
                       ),
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: const Color(0xFF7C3AED),
-                        width: 2,
-                      ),
+                      borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF7C3AED).withOpacity(0.4),
-                          blurRadius: 12,
-                          offset: const Offset(0, 0),
+                          color: const Color(0xFF7C3AED).withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
                         ),
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 6,
-                          offset: const Offset(0, 3),
+                          color: Colors.white.withOpacity(0.1),
+                          blurRadius: 1,
+                          offset: const Offset(0, -1),
                         ),
                       ],
                     ),
@@ -222,9 +184,9 @@ class PokerTableLayout extends StatelessWidget {
                       table.bettingRound.displayName.toUpperCase(),
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.0,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.8,
                         shadows: [
                           Shadow(
                             color: Colors.black,

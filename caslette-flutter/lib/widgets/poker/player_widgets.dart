@@ -36,28 +36,27 @@ class PlayerSeat extends StatelessWidget {
   }
 
   Widget _buildEmptySeat() {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      width: 80,
-      height: 60,
+    return Container(
+      width: 90,
+      height: 65,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
           colors: [
-            const Color(0xFF374151).withOpacity(0.4),
-            const Color(0xFF1F2937).withOpacity(0.6),
+            const Color(0xFF374151).withOpacity(0.3),
+            const Color(0xFF1F2937).withOpacity(0.5),
           ],
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: const Color(0xFF6B7280).withOpacity(0.6),
-          width: 1.5,
+          color: const Color(0xFF6B7280).withOpacity(0.4),
+          width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 6,
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 4,
             offset: const Offset(0, 2),
           ),
         ],
@@ -66,8 +65,8 @@ class PlayerSeat extends StatelessWidget {
         child: Text(
           'Seat $seatNumber',
           style: TextStyle(
-            color: Colors.white.withOpacity(0.6),
-            fontSize: 10,
+            color: Colors.white.withOpacity(0.5),
+            fontSize: 11,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -82,29 +81,28 @@ class PlayerSeat extends StatelessWidget {
         onTap: onJoinSeat,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          width: 80,
-          height: 60,
+          width: 90,
+          height: 65,
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
               colors: [
-                const Color(0xFF10B981).withOpacity(0.3),
-                const Color(0xFF059669).withOpacity(0.4),
+                const Color(0xFF10B981).withOpacity(0.8),
+                const Color(0xFF059669).withOpacity(0.9),
               ],
             ),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF10B981), width: 2),
+            borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF10B981).withOpacity(0.3),
+                color: const Color(0xFF10B981).withOpacity(0.4),
                 blurRadius: 8,
-                offset: const Offset(0, 0),
+                offset: const Offset(0, 4),
               ),
               BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
+                color: Colors.white.withOpacity(0.1),
+                blurRadius: 1,
+                offset: const Offset(0, -1),
               ),
             ],
           ),
@@ -112,24 +110,31 @@ class PlayerSeat extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                padding: const EdgeInsets.all(3),
+                padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
                   Icons.add_circle_outline,
                   color: Colors.white,
-                  size: 18,
+                  size: 16,
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 4),
               Text(
                 'Join Seat $seatNumber',
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 9,
+                  fontSize: 10,
                   fontWeight: FontWeight.w600,
+                  shadows: [
+                    Shadow(
+                      color: Colors.black,
+                      offset: Offset(0, 1),
+                      blurRadius: 1,
+                    ),
+                  ],
                 ),
               ),
             ],

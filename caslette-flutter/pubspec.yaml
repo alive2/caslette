@@ -82,7 +82,10 @@ flutter:
 
   # Assets
   assets:
-    - assets/images/poker_table_texture.png
+    # Poker table backgrounds with device-specific variants (JPG for better compression)
+    - assets/images/poker_table_bg.jpg
+    - assets/images/2.0x/poker_table_bg.jpg
+    - assets/images/3.0x/poker_table_bg.jpg
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
