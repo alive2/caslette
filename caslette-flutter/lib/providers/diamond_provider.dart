@@ -1,5 +1,4 @@
 import "package:flutter_riverpod/flutter_riverpod.dart";
-import "../services/websocket_service.dart";
 import "../services/api_service.dart";
 
 class DiamondState {
@@ -28,39 +27,8 @@ class DiamondNotifier extends StateNotifier<DiamondState> {
   DiamondNotifier(this._ref)
     : super(const DiamondState(balance: 0, isLoading: true));
 
-  void connectWebSocket(String token) {
-    final wsService = _ref.read(webSocketServiceProvider);
-
-    // Connect to WebSocket with auth token (like React app)
-    wsService.connect(token);
-
-    // Listen for balance updates
-    wsService.stream?.listen((data) {
-      if (data != null) {
-        try {
-          // Parse WebSocket message for balance updates
-          final message = data.toString();
-          if (message.contains('balance')) {
-            // Extract balance from message (simple parsing for demo)
-            final balanceMatch = RegExp(r'"balance":(\d+)').firstMatch(message);
-            if (balanceMatch != null) {
-              final newBalance = int.parse(balanceMatch.group(1)!);
-              state = state.copyWith(balance: newBalance);
-            }
-          }
-        } catch (e) {
-          print('Error parsing WebSocket message: $e');
-        }
-      }
-    });
-  }
-
   void updateBalance(int newBalance) {
     state = state.copyWith(balance: newBalance);
-
-    // Send update to backend via WebSocket
-    final wsService = _ref.read(webSocketServiceProvider);
-    wsService.send({'type': 'balance_update', 'balance': newBalance});
   }
 
   void addDiamonds(int amount) {

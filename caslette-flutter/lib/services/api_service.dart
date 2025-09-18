@@ -5,7 +5,7 @@ class ApiService {
   final Dio _dio = Dio();
 
   ApiService() {
-    _dio.options.baseUrl = "http://localhost:8080/api/v1";
+    _dio.options.baseUrl = "http://localhost:8081/api/v1";
     _dio.options.connectTimeout = const Duration(seconds: 5);
     _dio.options.receiveTimeout = const Duration(seconds: 3);
   }

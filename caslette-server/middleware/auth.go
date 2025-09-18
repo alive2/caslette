@@ -42,6 +42,12 @@ func AuthMiddleware(authService *auth.AuthService) gin.HandlerFunc {
 
 func CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Skip CORS handling for Socket.IO paths - let Socket.IO handle its own CORS
+		if strings.HasPrefix(c.Request.URL.Path, "/socket.io") {
+			c.Next()
+			return
+		}
+
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")

@@ -339,6 +339,65 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
           ),
         ),
+
+        const SizedBox(height: 12),
+
+        // Test Login button (for development)
+        SizedBox(
+          width: double.infinity,
+          height: 42,
+          child: OutlinedButton(
+            onPressed: _isLoading
+                ? null
+                : () async {
+                    if (mounted) {
+                      setState(() {
+                        _isLoading = true;
+                        _errorMessage = '';
+                      });
+                    }
+
+                    try {
+                      // Use the test credentials we created
+                      final success = await ref
+                          .read(authProvider.notifier)
+                          .login('david', 'password123');
+                      if (!success && mounted) {
+                        setState(() {
+                          _errorMessage = 'Test login failed.';
+                        });
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        setState(() {
+                          _errorMessage = 'Test login failed: ${e.toString()}';
+                        });
+                      }
+                    } finally {
+                      if (mounted) {
+                        setState(() {
+                          _isLoading = false;
+                        });
+                      }
+                    }
+                  },
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Color(0xFF9333EA)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              'TEST LOGIN (david/password123)',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF9333EA),
+                letterSpacing: 1,
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }

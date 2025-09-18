@@ -1,7 +1,7 @@
 import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:shared_preferences/shared_preferences.dart";
 import "../services/api_service.dart";
-import "diamond_provider.dart";
+import "socket_provider.dart";
 
 enum AuthState { unauthenticated, authenticated, loading }
 
@@ -39,8 +39,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final userId = prefs.getString('user_id');
 
       if (token != null && username != null && userId != null) {
-        _currentUser = User(id: userId, username: username, token: token);
+        final user = User(id: userId, username: username, token: token);
+        _currentUser = user;
         state = AuthState.authenticated;
+
+        // Connect to WebSocket for existing session
+        _connectToSocket(user);
       } else {
         state = AuthState.unauthenticated;
       }
@@ -73,6 +77,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
         await prefs.setString('user_id', user.id);
 
         state = AuthState.authenticated;
+
+        // Connect to WebSocket after successful authentication
+        _connectToSocket(user);
+
         return true;
       } else {
         state = AuthState.unauthenticated;
@@ -86,7 +94,42 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  // Connect to WebSocket and authenticate
+  Future<void> _connectToSocket(User user) async {
+    try {
+      final webSocketController = _ref.read(
+        webSocketControllerProvider.notifier,
+      );
+
+      // Connect to WebSocket server
+      await webSocketController.connect();
+
+      // Authenticate with WebSocket
+      final authenticated = await webSocketController.authenticate(user.token);
+
+      if (authenticated) {
+        print('WebSocket authentication successful');
+      } else {
+        print('WebSocket authentication failed');
+      }
+    } catch (e) {
+      print('WebSocket connection/authentication error: $e');
+      // Don't fail the login if WebSocket fails
+    }
+  }
+
   Future<void> logout() async {
+    // Disconnect from WebSocket first
+    try {
+      final webSocketController = _ref.read(
+        webSocketControllerProvider.notifier,
+      );
+      await webSocketController.disconnect();
+    } catch (e) {
+      print('WebSocket disconnect error: $e');
+    }
+
+    // Clear stored auth data
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
     await prefs.remove('username');
