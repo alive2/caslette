@@ -9,76 +9,157 @@ import (
 	"gorm.io/gorm"
 )
 
-type AuthHandler struct {
+type SecureAuthHandler struct {
 	db          *gorm.DB
 	authService *auth.AuthService
+	validator   *SecurityValidator
 }
 
-type LoginRequest struct {
+type SecureLoginRequest struct {
 	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required"`
 }
 
-type RegisterRequest struct {
+type SecureRegisterRequest struct {
 	Username  string `json:"username" binding:"required"`
 	Email     string `json:"email" binding:"required,email"`
-	Password  string `json:"password" binding:"required,min=6"`
+	Password  string `json:"password" binding:"required,min=8"`
 	FirstName string `json:"first_name"`
 	LastName  string `json:"last_name"`
 }
 
-type AuthResponse struct {
-	Token string      `json:"token"`
-	User  models.User `json:"user"`
+type SecureAuthResponse struct {
+	Token     string     `json:"token"`
+	User      SecureUser `json:"user"`
+	RequestID string     `json:"request_id"`
 }
 
-func NewAuthHandler(db *gorm.DB, authService *auth.AuthService) *AuthHandler {
-	return &AuthHandler{
+type SecureUser struct {
+	ID        uint   `json:"id"`
+	Username  string `json:"username"`
+	Email     string `json:"email"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	IsActive  bool   `json:"is_active"`
+	// Note: Password and sensitive data excluded
+}
+
+func NewSecureAuthHandler(db *gorm.DB, authService *auth.AuthService) *SecureAuthHandler {
+	return &SecureAuthHandler{
 		db:          db,
 		authService: authService,
+		validator:   NewSecurityValidator(),
 	}
 }
 
-func (h *AuthHandler) Register(c *gin.Context) {
-	var req RegisterRequest
+// Backward compatibility alias
+func NewAuthHandler(db *gorm.DB, authService *auth.AuthService) *SecureAuthHandler {
+	return NewSecureAuthHandler(db, authService)
+}
+
+func (h *SecureAuthHandler) Register(c *gin.Context) {
+	requestID, _ := c.Get("request_id")
+
+	var req SecureRegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":      "Invalid request format",
+			"request_id": requestID,
+		})
 		return
 	}
 
-	// Check if user already exists
+	// Validate and sanitize inputs
+	username, err := h.validator.ValidateAndSanitizeString(req.Username, "username", 30)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":      err.Error(),
+			"request_id": requestID,
+		})
+		return
+	}
+
+	email, err := h.validator.ValidateAndSanitizeString(req.Email, "email", 255)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":      err.Error(),
+			"request_id": requestID,
+		})
+		return
+	}
+
+	firstName, err := h.validator.ValidateAndSanitizeString(req.FirstName, "name", 50)
+	if err != nil && req.FirstName != "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":      err.Error(),
+			"request_id": requestID,
+		})
+		return
+	}
+
+	lastName, err := h.validator.ValidateAndSanitizeString(req.LastName, "name", 50)
+	if err != nil && req.LastName != "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":      err.Error(),
+			"request_id": requestID,
+		})
+		return
+	}
+
+	// Additional password validation
+	if len(req.Password) < 8 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":      "Password must be at least 8 characters",
+			"request_id": requestID,
+		})
+		return
+	}
+
+	// Check if user already exists using prepared statement pattern
 	var existingUser models.User
-	if err := h.db.Where("username = ? OR email = ?", req.Username, req.Email).First(&existingUser).Error; err == nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "User already exists"})
+	if err := h.db.Where("username = ? OR email = ?", username, email).First(&existingUser).Error; err == nil {
+		c.JSON(http.StatusConflict, gin.H{
+			"error":      "User already exists",
+			"request_id": requestID,
+		})
 		return
 	}
 
 	// Hash password
 	hashedPassword, err := h.authService.HashPassword(req.Password)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":      "Registration failed",
+			"request_id": requestID,
+		})
 		return
 	}
 
-	// Create user
+	// Create user with validated data
 	user := models.User{
-		Username:  req.Username,
-		Email:     req.Email,
+		Username:  username,
+		Email:     email,
 		Password:  hashedPassword,
-		FirstName: req.FirstName,
-		LastName:  req.LastName,
+		FirstName: firstName,
+		LastName:  lastName,
 		IsActive:  true,
 	}
 
-	if err := h.db.Create(&user).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
+	// Use transaction for data consistency
+	tx := h.db.Begin()
+	if err := tx.Create(&user).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":      "Registration failed",
+			"request_id": requestID,
+		})
 		return
 	}
 
 	// Assign default user role
 	var defaultRole models.Role
-	if err := h.db.Where("name = ?", "user").First(&defaultRole).Error; err == nil {
-		h.db.Model(&user).Association("Roles").Append(&defaultRole)
+	if err := tx.Where("name = ?", "user").First(&defaultRole).Error; err == nil {
+		tx.Model(&user).Association("Roles").Append(&defaultRole)
 	}
 
 	// Create initial diamond balance (1000 starting diamonds)
@@ -89,83 +170,168 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		Type:        "bonus",
 		Description: "Welcome bonus",
 	}
-	h.db.Create(&diamond)
+	if err := tx.Create(&diamond).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":      "Registration failed",
+			"request_id": requestID,
+		})
+		return
+	}
+
+	tx.Commit()
 
 	// Generate token
 	token, err := h.authService.GenerateToken(&user)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":      "Registration completed but login failed",
+			"request_id": requestID,
+		})
 		return
 	}
 
-	// Load user with roles for response
-	h.db.Preload("Roles").First(&user, user.ID)
+	// Return secure response (no sensitive data)
+	secureUser := SecureUser{
+		ID:        user.ID,
+		Username:  user.Username,
+		Email:     user.Email,
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
+		IsActive:  user.IsActive,
+	}
 
-	c.JSON(http.StatusCreated, AuthResponse{
-		Token: token,
-		User:  user,
+	c.JSON(http.StatusCreated, SecureAuthResponse{
+		Token:     token,
+		User:      secureUser,
+		RequestID: requestID.(string),
 	})
 }
 
-func (h *AuthHandler) Login(c *gin.Context) {
-	var req LoginRequest
+func (h *SecureAuthHandler) Login(c *gin.Context) {
+	requestID, _ := c.Get("request_id")
+
+	var req SecureLoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":      "Invalid request format",
+			"request_id": requestID,
+		})
 		return
 	}
 
-	// Find user
+	// Validate and sanitize inputs
+	username, err := h.validator.ValidateAndSanitizeString(req.Username, "username", 255)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":      "Invalid credentials",
+			"request_id": requestID,
+		})
+		return
+	}
+
+	// Basic password validation (don't reveal too much in error)
+	if len(req.Password) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":      "Invalid credentials",
+			"request_id": requestID,
+		})
+		return
+	}
+
+	// Find user using prepared statement
 	var user models.User
-	if err := h.db.Preload("Roles").Where("username = ? OR email = ?", req.Username, req.Username).First(&user).Error; err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+	if err := h.db.Preload("Roles").Where("username = ? OR email = ?", username, username).First(&user).Error; err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error":      "Invalid credentials",
+			"request_id": requestID,
+		})
 		return
 	}
 
 	// Check if user is active
 	if !user.IsActive {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User account is disabled"})
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error":      "Account disabled",
+			"request_id": requestID,
+		})
 		return
 	}
 
 	// Verify password
 	if err := h.authService.CheckPassword(user.Password, req.Password); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error":      "Invalid credentials",
+			"request_id": requestID,
+		})
 		return
 	}
 
 	// Generate token
 	token, err := h.authService.GenerateToken(&user)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":      "Login failed",
+			"request_id": requestID,
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, AuthResponse{
-		Token: token,
-		User:  user,
+	// Return secure response
+	secureUser := SecureUser{
+		ID:        user.ID,
+		Username:  user.Username,
+		Email:     user.Email,
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
+		IsActive:  user.IsActive,
+	}
+
+	c.JSON(http.StatusOK, SecureAuthResponse{
+		Token:     token,
+		User:      secureUser,
+		RequestID: requestID.(string),
 	})
 }
 
-func (h *AuthHandler) GetProfile(c *gin.Context) {
+func (h *SecureAuthHandler) GetProfile(c *gin.Context) {
+	requestID, _ := c.Get("request_id")
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error":      "Authentication required",
+			"request_id": requestID,
+		})
 		return
 	}
 
 	var user models.User
 	if err := h.db.Preload("Roles").Preload("Diamonds").First(&user, userID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":      "User not found",
+			"request_id": requestID,
+		})
 		return
 	}
 
-	// Calculate current diamond balance
+	// Calculate current diamond balance securely
 	var currentBalance int64
 	h.db.Model(&models.Diamond{}).Where("user_id = ?", userID).Order("created_at desc").Limit(1).Pluck("balance", &currentBalance)
 
+	// Return secure response
+	secureUser := SecureUser{
+		ID:        user.ID,
+		Username:  user.Username,
+		Email:     user.Email,
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
+		IsActive:  user.IsActive,
+	}
+
 	response := gin.H{
-		"user":            user,
+		"user":            secureUser,
 		"diamond_balance": currentBalance,
+		"request_id":      requestID,
 	}
 
 	c.JSON(http.StatusOK, response)

@@ -17,7 +17,7 @@ type Connection struct {
 	Username string
 	Conn     *websocket.Conn
 	Send     chan []byte
-	Hub      *Hub
+	Hub      HubInterface
 	Rooms    map[string]bool
 	mu       sync.RWMutex
 }
@@ -46,14 +46,13 @@ var upgrader = websocket.Upgrader{
 }
 
 // NewConnection creates a new WebSocket connection
-func NewConnection(hub *Hub, w http.ResponseWriter, r *http.Request) (*Connection, error) {
+func NewConnection(hub HubInterface, w http.ResponseWriter, r *http.Request) (*Connection, error) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	connection := &Connection{
-		ID:    generateConnectionID(),
 		Conn:  conn,
 		Send:  make(chan []byte, 256),
 		Hub:   hub,
@@ -149,7 +148,7 @@ func (c *Connection) GetRooms() []string {
 // readPump pumps messages from the websocket connection to the hub
 func (c *Connection) readPump() {
 	defer func() {
-		c.Hub.Unregister <- c
+		c.Hub.Unregister(c)
 		c.Close()
 	}()
 
