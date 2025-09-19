@@ -25,7 +25,7 @@ func (f *TexasHoldemEngineFactory) CreateEngine(gameType GameType, settings Tabl
 
 // TableGameIntegration provides integration between tables and game engines
 type TableGameIntegration struct {
-	tableManager *TableManager
+	tableManager *ActorTableManager
 	wsHandler    *TableWebSocketHandler
 }
 
@@ -35,7 +35,7 @@ func NewTableGameIntegration(hub WebSocketHub) *TableGameIntegration {
 	engineFactory := &TexasHoldemEngineFactory{}
 
 	// Create table manager
-	tableManager := NewTableManager(engineFactory)
+	tableManager := NewActorTableManager(engineFactory)
 
 	// Create websocket handler
 	wsHandler := NewTableWebSocketHandler(tableManager, hub)
@@ -47,7 +47,7 @@ func NewTableGameIntegration(hub WebSocketHub) *TableGameIntegration {
 }
 
 // GetTableManager returns the table manager
-func (tgi *TableGameIntegration) GetTableManager() *TableManager {
+func (tgi *TableGameIntegration) GetTableManager() *ActorTableManager {
 	return tgi.tableManager
 }
 

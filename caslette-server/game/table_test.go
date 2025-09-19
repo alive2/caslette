@@ -85,11 +85,10 @@ func NewMockConnection(userID, username string) *MockWebSocketConnection {
 // Test GameTable
 
 func TestNewGameTable(t *testing.T) {
-	settings := TableSettings{
-		SmallBlind: 10,
-		BigBlind:   20,
-		BuyIn:      1000,
-	}
+	settings := DefaultTableSettings()
+	settings.SmallBlind = 10
+	settings.BigBlind = 20
+	settings.BuyIn = 1000
 
 	table := NewGameTable("test123", "Test Table", GameTypeTexasHoldem, "user1", settings)
 
@@ -123,7 +122,7 @@ func TestNewGameTable(t *testing.T) {
 }
 
 func TestGameTablePlayerManagement(t *testing.T) {
-	table := NewGameTable("test", "Test", GameTypeTexasHoldem, "creator", TableSettings{})
+	table := NewGameTable("test", "Test", GameTypeTexasHoldem, "creator", DefaultTableSettings())
 
 	// Test initial state
 	if table.IsPlayerAtTable("user1") {
@@ -207,7 +206,7 @@ func TestTableManagerCreateTable(t *testing.T) {
 		GameType:    GameTypeTexasHoldem,
 		CreatedBy:   "user1",
 		Username:    "User1",
-		Settings:    TableSettings{SmallBlind: 10, BigBlind: 20},
+		Settings:    DefaultTableSettings(),
 		Description: "Test description",
 		Tags:        []string{"casual", "beginner"},
 	}
@@ -255,7 +254,7 @@ func TestTableManagerJoinLeave(t *testing.T) {
 		GameType:  GameTypeTexasHoldem,
 		CreatedBy: "creator",
 		Username:  "Creator",
-		Settings:  TableSettings{},
+		Settings:  DefaultTableSettings(),
 	}
 
 	table, err := manager.CreateTable(ctx, createReq)
@@ -363,20 +362,27 @@ func TestTableManagerFiltering(t *testing.T) {
 	ctx := context.Background()
 
 	// Create different types of tables
+	settings1 := DefaultTableSettings()
+	settings1.ObserversAllowed = true
+
+	settings2 := DefaultTableSettings()
+	settings2.Private = true
+	settings2.ObserversAllowed = false // Explicitly disable observers for this table
+
 	tables := []*TableCreateRequest{
 		{
 			Name:      "Texas Hold'em Table",
 			GameType:  GameTypeTexasHoldem,
 			CreatedBy: "user1",
 			Username:  "User1",
-			Settings:  TableSettings{ObserversAllowed: true},
+			Settings:  settings1,
 		},
 		{
 			Name:      "Private Table",
 			GameType:  GameTypeTexasHoldem,
 			CreatedBy: "user2",
 			Username:  "User2",
-			Settings:  TableSettings{Private: true},
+			Settings:  settings2,
 		},
 	}
 
@@ -426,7 +432,7 @@ func TestTableManagerStats(t *testing.T) {
 		GameType:  GameTypeTexasHoldem,
 		CreatedBy: "user1",
 		Username:  "User1",
-		Settings:  TableSettings{},
+		Settings:  DefaultTableSettings(),
 	})
 
 	table2, _ := manager.CreateTable(ctx, &TableCreateRequest{
@@ -434,7 +440,7 @@ func TestTableManagerStats(t *testing.T) {
 		GameType:  GameTypeTexasHoldem,
 		CreatedBy: "user2",
 		Username:  "User2",
-		Settings:  TableSettings{},
+		Settings:  DefaultTableSettings(),
 	})
 
 	// Add some players
@@ -509,7 +515,8 @@ func TestTableWebSocketHandler(t *testing.T) {
 
 func TestTableWebSocketCreateTable(t *testing.T) {
 	factory := &MockGameEngineFactory{}
-	manager := NewTableManager(factory)
+	manager := NewActorTableManager(factory)
+	defer manager.Stop()
 	hub := &MockWebSocketHub{}
 
 	handler := NewTableWebSocketHandler(manager, hub)
@@ -529,6 +536,7 @@ func TestTableWebSocketCreateTable(t *testing.T) {
 			"settings": map[string]interface{}{
 				"small_blind": 10,
 				"big_blind":   20,
+				"buy_in":      100,
 			},
 		},
 	}
@@ -567,7 +575,7 @@ func TestTableWebSocketJoinTable(t *testing.T) {
 		GameType:  GameTypeTexasHoldem,
 		CreatedBy: "creator",
 		Username:  "Creator",
-		Settings:  TableSettings{},
+		Settings:  DefaultTableSettings(),
 	})
 
 	// Test joining

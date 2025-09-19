@@ -14,9 +14,6 @@ func NewDataFilter() *DataFilter {
 
 // FilterTableInfo returns filtered table information based on user context
 func (df *DataFilter) FilterTableInfo(table *GameTable, requesterID string, requesterRole string) map[string]interface{} {
-	table.mutex.RLock()
-	defer table.mutex.RUnlock()
-
 	// Base public information available to everyone
 	info := map[string]interface{}{
 		"id":             table.ID,
@@ -189,9 +186,6 @@ func (df *DataFilter) filterObservers(observers []TableObserver, requesterID str
 
 // FilterGameState returns filtered game state information
 func (df *DataFilter) FilterGameState(table *GameTable, requesterID string) map[string]interface{} {
-	table.mutex.RLock()
-	defer table.mutex.RUnlock()
-
 	isPlayer := table.IsPlayerAtTable(requesterID)
 	isObserver := table.IsObserver(requesterID)
 	isCreator := table.CreatedBy == requesterID

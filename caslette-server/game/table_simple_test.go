@@ -8,11 +8,10 @@ import (
 
 // TestTableBasics tests basic table functionality without websockets
 func TestTableBasics(t *testing.T) {
-	settings := TableSettings{
-		SmallBlind: 10,
-		BigBlind:   20,
-		BuyIn:      1000,
-	}
+	settings := DefaultTableSettings()
+	settings.SmallBlind = 10
+	settings.BigBlind = 20
+	settings.BuyIn = 1000
 
 	table := NewGameTable("test123", "Test Table", GameTypeTexasHoldem, "user1", settings)
 
@@ -46,7 +45,7 @@ func TestTableBasics(t *testing.T) {
 }
 
 func TestTablePlayerSlots(t *testing.T) {
-	table := NewGameTable("test", "Test", GameTypeTexasHoldem, "creator", TableSettings{})
+	table := NewGameTable("test", "Test", GameTypeTexasHoldem, "creator", DefaultTableSettings())
 
 	// Test initial state
 	if table.IsPlayerAtTable("user1") {
@@ -87,7 +86,8 @@ func TestTablePlayerSlots(t *testing.T) {
 }
 
 func TestTableObservers(t *testing.T) {
-	settings := TableSettings{ObserversAllowed: true} // Enable observers
+	settings := DefaultTableSettings()
+	settings.ObserversAllowed = true // Enable observers
 	table := NewGameTable("test", "Test", GameTypeTexasHoldem, "creator", settings)
 
 	// Test observer management
@@ -129,7 +129,7 @@ func TestTableManagerBasic(t *testing.T) {
 		GameType:    GameTypeTexasHoldem,
 		CreatedBy:   "user1",
 		Username:    "User1",
-		Settings:    TableSettings{SmallBlind: 10, BigBlind: 20},
+		Settings:    DefaultTableSettings(),
 		Description: "Test description",
 		Tags:        []string{"casual", "beginner"},
 	}
@@ -170,14 +170,23 @@ func TestTableManagerFilters(t *testing.T) {
 			GameType:  GameTypeTexasHoldem,
 			CreatedBy: "user1",
 			Username:  "User1",
-			Settings:  TableSettings{ObserversAllowed: true},
+			Settings: func() TableSettings {
+				s := DefaultTableSettings()
+				s.ObserversAllowed = true
+				return s
+			}(),
 		},
 		{
 			Name:      "Private Table",
 			GameType:  GameTypeTexasHoldem,
 			CreatedBy: "user2",
 			Username:  "User2",
-			Settings:  TableSettings{Private: true},
+			Settings: func() TableSettings {
+				s := DefaultTableSettings()
+				s.Private = true
+				s.ObserversAllowed = false // Disable observers for this table
+				return s
+			}(),
 		},
 	}
 

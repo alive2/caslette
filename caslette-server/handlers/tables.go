@@ -13,11 +13,11 @@ import (
 // TableHandler handles HTTP requests for table operations
 type TableHandler struct {
 	db           *gorm.DB
-	tableManager *game.TableManager
+	tableManager *game.ActorTableManager
 }
 
 // NewTableHandler creates a new table handler
-func NewTableHandler(db *gorm.DB, tableManager *game.TableManager) *TableHandler {
+func NewTableHandler(db *gorm.DB, tableManager *game.ActorTableManager) *TableHandler {
 	return &TableHandler{
 		db:           db,
 		tableManager: tableManager,

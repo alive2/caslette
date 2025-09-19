@@ -3,6 +3,7 @@ package game
 import (
 	"fmt"
 	"html"
+	"net/url"
 	"regexp"
 	"strings"
 	"unicode/utf8"
@@ -137,27 +138,27 @@ func (v *TableValidator) ValidateTableName(name string) error {
 		return fmt.Errorf("table name cannot be empty")
 	}
 
-	// Sanitize HTML and trim spaces
-	name = strings.TrimSpace(v.SanitizeInput(name))
+	// Trim spaces but don't HTML escape yet (we'll do that when storing)
+	originalName := strings.TrimSpace(name)
 
-	if len(name) < MinTableNameLength {
+	if len(originalName) < MinTableNameLength {
 		return fmt.Errorf("table name too short (min %d characters)", MinTableNameLength)
 	}
 
-	if len(name) > MaxTableNameLength {
+	if len(originalName) > MaxTableNameLength {
 		return fmt.Errorf("table name too long (max %d characters)", MaxTableNameLength)
 	}
 
-	if !utf8.ValidString(name) {
+	if !utf8.ValidString(originalName) {
 		return fmt.Errorf("table name contains invalid UTF-8 characters")
 	}
 
-	if !tableNameRegex.MatchString(name) {
+	if !tableNameRegex.MatchString(originalName) {
 		return fmt.Errorf("table name contains invalid characters")
 	}
 
-	// Check for common injection patterns
-	if v.containsSQLInjectionPatterns(name) {
+	// Check for common injection patterns on the original name
+	if v.containsSQLInjectionPatterns(originalName) {
 		return fmt.Errorf("table name contains invalid patterns")
 	}
 
@@ -223,9 +224,13 @@ func (v *TableValidator) ValidateTableID(tableID string) error {
 
 	tableID = strings.TrimSpace(tableID)
 
-	// Table IDs should be hex strings of specific length
-	if matched, _ := regexp.MatchString(`^[a-f0-9]{16}$`, tableID); !matched {
-		return fmt.Errorf("table ID format invalid")
+	// Table IDs should be reasonable alphanumeric strings (8-32 chars)
+	if len(tableID) < 8 || len(tableID) > 32 {
+		return fmt.Errorf("table ID length invalid (must be 8-32 characters)")
+	}
+
+	if matched, _ := regexp.MatchString(`^[a-zA-Z0-9\-_]+$`, tableID); !matched {
+		return fmt.Errorf("table ID contains invalid characters")
 	}
 
 	return nil
@@ -247,6 +252,14 @@ func (v *TableValidator) ValidateDescription(description string) error {
 		return nil // Description is optional
 	}
 
+	// Store original for pattern checking
+	originalDescription := description
+
+	// Check for injection patterns BEFORE sanitizing
+	if v.containsSQLInjectionPatterns(originalDescription) {
+		return fmt.Errorf("description contains invalid patterns")
+	}
+
 	// Sanitize HTML
 	description = v.SanitizeInput(description)
 
@@ -256,11 +269,6 @@ func (v *TableValidator) ValidateDescription(description string) error {
 
 	if !utf8.ValidString(description) {
 		return fmt.Errorf("description contains invalid UTF-8 characters")
-	}
-
-	// Check for injection patterns
-	if v.containsSQLInjectionPatterns(description) {
-		return fmt.Errorf("description contains invalid patterns")
 	}
 
 	return nil
@@ -372,26 +380,141 @@ func (v *TableValidator) SanitizeInput(input string) string {
 
 // containsSQLInjectionPatterns checks for common SQL injection patterns
 func (v *TableValidator) containsSQLInjectionPatterns(input string) bool {
+	originalInput := input
 	input = strings.ToLower(input)
 
-	// Common SQL injection patterns (excluding single quotes for normal text)
-	patterns := []string{
-		"\"", ";", "--", "/*", "*/", "xp_", "sp_",
-		"exec", "execute", "select", "insert", "update", "delete",
-		"drop", "create", "alter", "union", "script", "javascript",
-		"vbscript", "onload", "onerror", "onclick", "\x00",
+	// Remove URL encoding to catch encoded attacks
+	decodedInput := input
+	if decoded, err := url.QueryUnescape(input); err == nil {
+		decodedInput = strings.ToLower(decoded)
 	}
 
-	for _, pattern := range patterns {
-		if strings.Contains(input, pattern) {
+	// Check both original and decoded input
+	inputs := []string{input, decodedInput}
+
+	for _, checkInput := range inputs {
+		// SQL injection keywords and patterns
+		sqlKeywords := []string{
+			"select", "union", "insert", "update", "delete", "drop", "create", "alter",
+			"exec", "execute", "sp_", "xp_", "waitfor", "delay", "sleep",
+			"information_schema", "sysobjects", "syscolumns", "msysaccessobjects",
+			"pg_", "mysql", "oracle", "mssql", "sqlite", "substr", "substring",
+			"concat", "char", "ascii", "benchmark", "extractvalue", "updatexml",
+			"load_file", "into outfile", "into dumpfile", "sqlmap", "havij",
+			// NoSQL injection patterns
+			"$where", "$gt", "$ne", "$regex", "$exists", "$in", "$nin", "$or", "$and",
+			"function()", "emit(", "map(", "reduce(", "finalize(",
+		}
+
+		// Dangerous operator patterns
+		dangerousPatterns := []string{
+			"; drop", "; delete", "; insert", "; update", "; create", "; alter",
+			"' or ", "\" or ", "' and ", "\" and ",
+			"' union", "\" union", "'union", "\"union",
+			"1=1", "1=2", "'='", "\"=\"", "'1'='1", "\"1\"=\"1",
+			"'; --", "\"; --", "'/*", "\"/*", "*/", "--",
+			"'||'", "\"||\"", "'+'", "\"+\"",
+			"0x", "char(", "ascii(", "substr(", "substring(",
+			"concat(", "group_concat(", "hex(", "unhex(",
+			"<script", "javascript:", "vbscript:", "onload=", "onerror=", "onclick=",
+			"onmouseover=", "onfocus=", "onblur=", "onchange=", "onsubmit=",
+			"ng-click=", "ng-app", "$event.view", "{{", "}}", "<%", "%>",
+			"eval(", "expression(", "import(", "require(",
+			"\x00", // null byte
+			"${", "#{", "<%", "%>", "{{", "}}",
+			"../", "..\\", "%2e%2e", "%252e%252e", "%252f", "%u002f",
+			"..;/", "../;", "\\u002e", "\\u002f",
+			"file://", "http://", "https://", "ftp://",
+			"\\\\", "\\x", "\\u00", "\\u20", "%00", "%0a", "%0d",
+			"'x'='x", "'x'='y", "\"x\"=\"x", "\"x\"=\"y", // Boolean injection patterns
+			// Command injection patterns
+			"; ls", "; dir", "; cat", "; type", "; echo", "; rm", "; del",
+			"; wget", "; curl", "; nc", "; netcat", "; python", "; perl",
+			"| ls", "| dir", "| cat", "| type", "| echo", "| nc", "| curl",
+			"& whoami", "& echo", "& dir", "& ls", "&& rm", "&& del",
+			"|| echo", "`ls", "`cat", "`whoami", "`echo", "`dir",
+			"$(ls", "$(cat", "$(whoami", "$(echo", "$(rm", "$(python",
+			"; python -c", "; perl -e", "wget ", "curl ",
+			// LDAP injection patterns
+			"*)((", "*)(", ")(&", "))(|", "objectclass=", "\\2a", "\\29", "\\28",
+			// Format string patterns
+			"%n", "%$", "%.*", "%.1000", "%1000", "%7$", "%8$", "%9$",
+		}
+
+		// Check for SQL keywords in suspicious contexts
+		for _, keyword := range sqlKeywords {
+			if strings.Contains(checkInput, keyword) {
+				// Allow common words in normal contexts
+				if keyword == "select" || keyword == "insert" || keyword == "update" || keyword == "delete" {
+					// Only flag if followed by SQL-like patterns
+					keywordIndex := strings.Index(checkInput, keyword)
+					if keywordIndex != -1 && keywordIndex < len(checkInput)-len(keyword) {
+						remaining := checkInput[keywordIndex+len(keyword):]
+						if strings.Contains(remaining, " from") || strings.Contains(remaining, " into") ||
+							strings.Contains(remaining, " where") || strings.Contains(remaining, " set") ||
+							strings.Contains(remaining, "*") || strings.Contains(remaining, "password") ||
+							strings.Contains(remaining, "user") {
+							return true
+						}
+					}
+				} else {
+					return true
+				}
+			}
+		}
+
+		// Check for dangerous patterns
+		for _, pattern := range dangerousPatterns {
+			if strings.Contains(checkInput, pattern) {
+				return true
+			}
+		}
+
+		// Check for multiple single quotes (often used in SQL injection)
+		if strings.Count(checkInput, "'") > 2 || strings.Count(checkInput, "\"") > 2 {
+			return true
+		}
+
+		// Check for suspicious character combinations
+		suspiciousRegexes := []*regexp.Regexp{
+			regexp.MustCompile(`['"]\s*(\bor\b|\band\b|\bunion\b)\s*['"]?`),
+			regexp.MustCompile(`['"]\s*;\s*\w+`),
+			regexp.MustCompile(`\b(union|select|insert|update|delete|drop|create|alter)\s+.*\s+(from|into|where|set|table|database)`),
+			regexp.MustCompile(`\b\d+\s*=\s*\d+\b`),
+			regexp.MustCompile(`['"]\s*\+\s*['"]`),
+			regexp.MustCompile(`['"]\s*\|\|\s*['"]`),
+			regexp.MustCompile(`\s*--\s*$`),
+			regexp.MustCompile(`/\*.*\*/`),
+			regexp.MustCompile(`/\*\s*$`), // Comment start at end
+			regexp.MustCompile(`\${.*}`),
+			regexp.MustCompile(`#{.*}`),
+			regexp.MustCompile(`<%.*%>`),
+			regexp.MustCompile(`{{.*}}`),
+			regexp.MustCompile(`'\s*or\s*'.*?'\s*=\s*'.*?'`), // 'x'='x pattern with any values
+			regexp.MustCompile(`"\s*or\s*".*?"\s*=\s*".*?"`), // "x"="x pattern with any values
+		}
+
+		for _, regex := range suspiciousRegexes {
+			if regex.MatchString(checkInput) {
+				return true
+			}
+		}
+	}
+
+	// Check for format string attacks
+	if strings.Count(originalInput, "%") > 5 {
+		return true
+	}
+
+	// Check for excessive repetition (potential buffer overflow)
+	for _, char := range []string{"A", "B", "C", "X", "1", "0"} {
+		if strings.Count(originalInput, char) > 100 {
 			return true
 		}
 	}
 
 	return false
-}
-
-// ValidateFilterRequest validates table filtering requests
+} // ValidateFilterRequest validates table filtering requests
 func (v *TableValidator) ValidateFilterRequest(filters map[string]interface{}) error {
 	allowedFilters := map[string]bool{
 		"game_type":   true,

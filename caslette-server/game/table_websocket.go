@@ -24,12 +24,12 @@ type WebSocketHub interface {
 
 // TableWebSocketHandler handles websocket messages for table operations
 type TableWebSocketHandler struct {
-	tableManager *TableManager
+	tableManager *ActorTableManager
 	hub          WebSocketHub
 }
 
 // NewTableWebSocketHandler creates a new table websocket handler
-func NewTableWebSocketHandler(tableManager *TableManager, hub WebSocketHub) *TableWebSocketHandler {
+func NewTableWebSocketHandler(tableManager *ActorTableManager, hub WebSocketHub) *TableWebSocketHandler {
 	handler := &TableWebSocketHandler{
 		tableManager: tableManager,
 		hub:          hub,
@@ -251,10 +251,8 @@ func (h *TableWebSocketHandler) handleSetReady(ctx context.Context, conn WebSock
 	}
 
 	// Update ready state
-	table.mutex.Lock()
 	table.PlayerSlots[position].IsReady = req.Ready
 	table.Touch()
-	table.mutex.Unlock()
 
 	// Broadcast update to room
 	h.broadcastTableUpdate(table, "player_ready_changed", map[string]interface{}{
@@ -300,9 +298,7 @@ func (h *TableWebSocketHandler) handleStartGame(ctx context.Context, conn WebSoc
 	}
 
 	// Try to start game
-	table.mutex.Lock()
 	err = h.tableManager.tryStartGame(table)
-	table.mutex.Unlock()
 
 	if err != nil {
 		return h.errorResponse(msg.RequestID, "START_FAILED", err.Error())

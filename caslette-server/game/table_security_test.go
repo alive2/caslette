@@ -61,15 +61,13 @@ func TestTableSecurityValidation(t *testing.T) {
 
 // TestTableRateLimiting tests rate limiting functionality
 func TestTableRateLimiting(t *testing.T) {
-	rateLimiter := NewRateLimiter()
-
-	// Override limits for testing
-	rateLimiter.SetLimits(map[string]interface{}{
-		"max_tables_per_user":    2,
+	rateLimiter := NewActorRateLimiterWithLimits(map[string]interface{}{
+		"max_tables_per_user":    10, // High enough to not interfere with window-based test
 		"max_creates_per_window": 3,
 		"max_joins_per_window":   5,
 		"max_observer_tables":    3,
 	})
+	defer rateLimiter.Stop()
 
 	userID := "test_user"
 
@@ -79,6 +77,8 @@ func TestTableRateLimiting(t *testing.T) {
 		if err != nil {
 			t.Errorf("Expected to allow table creation %d, got error: %v", i+1, err)
 		}
+		// Record that the table was actually created
+		rateLimiter.RecordTableCreated(userID, fmt.Sprintf("table_%d", i))
 	}
 
 	// Should hit rate limit on 4th attempt
@@ -89,14 +89,17 @@ func TestTableRateLimiting(t *testing.T) {
 
 	// Test join limits
 	for i := 0; i < 5; i++ {
-		err := rateLimiter.CanJoinTable(userID, "table123")
+		tableID := fmt.Sprintf("join_table_%d", i)
+		err := rateLimiter.CanJoinTable(userID, tableID)
 		if err != nil {
 			t.Errorf("Expected to allow join attempt %d, got error: %v", i+1, err)
 		}
+		// Record that the player actually joined
+		rateLimiter.RecordPlayerJoined(userID, tableID)
 	}
 
 	// Should hit rate limit on 6th attempt
-	err = rateLimiter.CanJoinTable(userID, "table456")
+	err = rateLimiter.CanJoinTable(userID, "final_join_table")
 	if err == nil {
 		t.Error("Expected rate limit error on 6th join attempt")
 	}

@@ -1,7 +1,6 @@
 package game
 
 import (
-	"sync"
 	"time"
 )
 
@@ -82,9 +81,6 @@ type GameTable struct {
 	// Metadata
 	Description string   `json:"description,omitempty"`
 	Tags        []string `json:"tags,omitempty"`
-
-	// Internal
-	mutex sync.RWMutex `json:"-"`
 }
 
 // NewGameTable creates a new game table
@@ -128,9 +124,6 @@ func NewGameTable(id, name string, gameType GameType, createdBy string, settings
 
 // GetPlayerCount returns the number of active players
 func (t *GameTable) GetPlayerCount() int {
-	t.mutex.RLock()
-	defer t.mutex.RUnlock()
-
 	count := 0
 	for _, slot := range t.PlayerSlots {
 		if slot.PlayerID != "" {
@@ -142,9 +135,6 @@ func (t *GameTable) GetPlayerCount() int {
 
 // GetObserverCount returns the number of observers
 func (t *GameTable) GetObserverCount() int {
-	t.mutex.RLock()
-	defer t.mutex.RUnlock()
-
 	return len(t.Observers)
 }
 
@@ -155,9 +145,6 @@ func (t *GameTable) GetTotalCount() int {
 
 // IsPlayerAtTable checks if a player is sitting at the table
 func (t *GameTable) IsPlayerAtTable(playerID string) bool {
-	t.mutex.RLock()
-	defer t.mutex.RUnlock()
-
 	for _, slot := range t.PlayerSlots {
 		if slot.PlayerID == playerID {
 			return true
@@ -168,9 +155,6 @@ func (t *GameTable) IsPlayerAtTable(playerID string) bool {
 
 // IsObserver checks if a player is observing the table
 func (t *GameTable) IsObserver(playerID string) bool {
-	t.mutex.RLock()
-	defer t.mutex.RUnlock()
-
 	for _, observer := range t.Observers {
 		if observer.PlayerID == playerID {
 			return true
@@ -181,9 +165,6 @@ func (t *GameTable) IsObserver(playerID string) bool {
 
 // GetPlayerPosition returns the position of a player at the table (-1 if not found)
 func (t *GameTable) GetPlayerPosition(playerID string) int {
-	t.mutex.RLock()
-	defer t.mutex.RUnlock()
-
 	for _, slot := range t.PlayerSlots {
 		if slot.PlayerID == playerID {
 			return slot.Position
@@ -194,9 +175,6 @@ func (t *GameTable) GetPlayerPosition(playerID string) int {
 
 // CanJoinAsPlayer checks if a player can join as a player
 func (t *GameTable) CanJoinAsPlayer(playerID string) bool {
-	t.mutex.RLock()
-	defer t.mutex.RUnlock()
-
 	// Check if table is in a joinable state
 	if t.Status != TableStatusWaiting && t.Status != TableStatusPaused {
 		return false
@@ -213,9 +191,6 @@ func (t *GameTable) CanJoinAsPlayer(playerID string) bool {
 
 // CanJoinAsObserver checks if a player can join as an observer
 func (t *GameTable) CanJoinAsObserver(playerID string) bool {
-	t.mutex.RLock()
-	defer t.mutex.RUnlock()
-
 	// Check if observers are allowed
 	if !t.Settings.ObserversAllowed {
 		return false
@@ -232,9 +207,6 @@ func (t *GameTable) CanJoinAsObserver(playerID string) bool {
 
 // GetAvailableSlots returns positions of available player slots
 func (t *GameTable) GetAvailableSlots() []int {
-	t.mutex.RLock()
-	defer t.mutex.RUnlock()
-
 	var available []int
 	for _, slot := range t.PlayerSlots {
 		if slot.PlayerID == "" {
@@ -246,9 +218,6 @@ func (t *GameTable) GetAvailableSlots() []int {
 
 // GetTableInfo returns public information about the table
 func (t *GameTable) GetTableInfo() map[string]interface{} {
-	t.mutex.RLock()
-	defer t.mutex.RUnlock()
-
 	return map[string]interface{}{
 		"id":             t.ID,
 		"name":           t.Name,
@@ -260,7 +229,7 @@ func (t *GameTable) GetTableInfo() map[string]interface{} {
 		"max_players":    t.MaxPlayers,
 		"min_players":    t.MinPlayers,
 		"player_count":   t.GetPlayerCount(),
-		"observer_count": t.GetObserverCount(),
+		"observer_count": len(t.Observers),
 		"settings":       t.Settings,
 		"description":    t.Description,
 		"tags":           t.Tags,
@@ -272,9 +241,6 @@ func (t *GameTable) GetTableInfo() map[string]interface{} {
 func (t *GameTable) GetDetailedInfo() map[string]interface{} {
 	info := t.GetTableInfo()
 
-	t.mutex.RLock()
-	defer t.mutex.RUnlock()
-
 	// Add detailed player information
 	info["player_slots"] = t.PlayerSlots
 	info["observers"] = t.Observers
@@ -284,8 +250,5 @@ func (t *GameTable) GetDetailedInfo() map[string]interface{} {
 
 // Touch updates the UpdatedAt timestamp
 func (t *GameTable) Touch() {
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
-
 	t.UpdatedAt = time.Now()
 }
