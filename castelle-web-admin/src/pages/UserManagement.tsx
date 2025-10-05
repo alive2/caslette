@@ -61,7 +61,7 @@ const UserManagement: React.FC = () => {
       const response = await userApi.getUsers();
       setState((prev) => ({
         ...prev,
-        users: response.users || [],
+        users: response.data?.users || [],
         loading: false,
       }));
     } catch (error) {
@@ -188,7 +188,7 @@ const UserManagement: React.FC = () => {
       const response = await roleApi.getRoles();
       setState((prev) => ({
         ...prev,
-        roles: response.roles || [],
+        roles: response.data?.roles || [],
       }));
     } catch (error) {
       console.error("Failed to fetch roles:", error);
@@ -200,7 +200,7 @@ const UserManagement: React.FC = () => {
       const response = await permissionApi.getPermissions();
       setState((prev) => ({
         ...prev,
-        permissions: response.permissions || [],
+        permissions: response.data?.permissions || [],
       }));
     } catch (error) {
       console.error("Failed to fetch permissions:", error);

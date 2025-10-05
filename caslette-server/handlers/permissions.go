@@ -19,14 +19,26 @@ func NewPermissionHandler(db *gorm.DB) *PermissionHandler {
 
 // GetPermissions returns all permissions
 func (h *PermissionHandler) GetPermissions(c *gin.Context) {
+	requestID, _ := c.Get("request_id")
+
 	var permissions []models.Permission
 
 	if err := h.db.Find(&permissions).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch permissions"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success":    false,
+			"error":      "Failed to fetch permissions",
+			"request_id": requestID,
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"permissions": permissions})
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"permissions": permissions,
+		},
+		"request_id": requestID,
+	})
 }
 
 // GetPermission returns a specific permission by ID

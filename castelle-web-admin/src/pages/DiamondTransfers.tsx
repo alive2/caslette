@@ -55,7 +55,7 @@ const DiamondTransfers: React.FC = () => {
       const response = await userApi.getUsers();
       setState((prev) => ({
         ...prev,
-        users: response.users || [],
+        users: response.data?.users || [],
       }));
     } catch (error) {
       console.error("Failed to fetch users:", error);
@@ -71,10 +71,10 @@ const DiamondTransfers: React.FC = () => {
       );
       setState((prev) => ({
         ...prev,
-        transactions: response.transactions || [],
+        transactions: response.data?.transactions || [],
         pagination: {
           ...prev.pagination,
-          total: response.total || 0,
+          total: response.data?.pagination?.total || 0,
         },
         loading: false,
       }));

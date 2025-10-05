@@ -19,14 +19,26 @@ func NewRoleHandler(db *gorm.DB) *RoleHandler {
 
 // GetRoles returns all roles with their permissions
 func (h *RoleHandler) GetRoles(c *gin.Context) {
+	requestID, _ := c.Get("request_id")
+
 	var roles []models.Role
 
 	if err := h.db.Preload("Permissions").Find(&roles).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch roles"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success":    false,
+			"error":      "Failed to fetch roles",
+			"request_id": requestID,
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"roles": roles})
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"roles": roles,
+		},
+		"request_id": requestID,
+	})
 }
 
 // GetRole returns a specific role by ID with its permissions

@@ -42,6 +42,9 @@ func main() {
 	// Add CORS middleware
 	router.Use(middleware.CORSMiddleware())
 
+	// Add Request ID middleware
+	router.Use(middleware.RequestIDMiddleware())
+
 	// API routes
 	api := router.Group("/api/v1")
 	{

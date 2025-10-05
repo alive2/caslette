@@ -29,14 +29,32 @@ type SecureAssignRoleRequest struct {
 
 // SecureUserResponse with sanitized data
 type SecureUserResponse struct {
-	ID        uint   `json:"id"`
-	Username  string `json:"username"`
-	Email     string `json:"email,omitempty"` // Only include for authorized users
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	IsActive  bool   `json:"is_active"`
-	CreatedAt string `json:"created_at"`
-	RequestID string `json:"request_id"`
+	ID          uint                       `json:"id"`
+	Username    string                     `json:"username"`
+	Email       string                     `json:"email,omitempty"` // Only include for authorized users
+	FirstName   string                     `json:"first_name"`
+	LastName    string                     `json:"last_name"`
+	IsActive    bool                       `json:"is_active"`
+	CreatedAt   string                     `json:"created_at"`
+	Roles       []SecureRoleResponse       `json:"roles"`
+	Permissions []SecurePermissionResponse `json:"permissions"`
+	RequestID   string                     `json:"request_id"`
+}
+
+// SecureRoleResponse for role information in user responses
+type SecureRoleResponse struct {
+	ID          uint   `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// SecurePermissionResponse for permission information in user responses
+type SecurePermissionResponse struct {
+	ID          uint   `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Resource    string `json:"resource"`
+	Action      string `json:"action"`
 }
 
 // SecureUserListResponse for paginated user lists
@@ -131,8 +149,8 @@ func (h *SecureUserHandler) GetUsers(c *gin.Context) {
 		return
 	}
 
-	// Get users with limited data exposure
-	if err := h.db.Select("id, username, email, first_name, last_name, is_active, created_at").
+	// Get users with roles and permissions
+	if err := h.db.Preload("Roles").Preload("Permissions").
 		Limit(limit).Offset(offset).Find(&users).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success":    false,
@@ -145,15 +163,39 @@ func (h *SecureUserHandler) GetUsers(c *gin.Context) {
 	// Create secure response
 	secureUsers := make([]SecureUserResponse, len(users))
 	for i, user := range users {
+		// Convert roles to secure format
+		secureRoles := make([]SecureRoleResponse, len(user.Roles))
+		for j, role := range user.Roles {
+			secureRoles[j] = SecureRoleResponse{
+				ID:          role.ID,
+				Name:        role.Name,
+				Description: role.Description,
+			}
+		}
+
+		// Convert permissions to secure format
+		securePermissions := make([]SecurePermissionResponse, len(user.Permissions))
+		for j, permission := range user.Permissions {
+			securePermissions[j] = SecurePermissionResponse{
+				ID:          permission.ID,
+				Name:        permission.Name,
+				Description: permission.Description,
+				Resource:    permission.Resource,
+				Action:      permission.Action,
+			}
+		}
+
 		secureUsers[i] = SecureUserResponse{
-			ID:        user.ID,
-			Username:  user.Username,
-			Email:     user.Email, // Only admins see this
-			FirstName: user.FirstName,
-			LastName:  user.LastName,
-			IsActive:  user.IsActive,
-			CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z"),
-			RequestID: requestID.(string),
+			ID:          user.ID,
+			Username:    user.Username,
+			Email:       user.Email, // Only admins see this
+			FirstName:   user.FirstName,
+			LastName:    user.LastName,
+			IsActive:    user.IsActive,
+			CreatedAt:   user.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			Roles:       secureRoles,
+			Permissions: securePermissions,
+			RequestID:   requestID.(string),
 		}
 	}
 
@@ -213,7 +255,7 @@ func (h *SecureUserHandler) GetUser(c *gin.Context) {
 	}
 
 	var user models.User
-	if err := h.db.Select("id, username, email, first_name, last_name, is_active, created_at").
+	if err := h.db.Preload("Roles").Preload("Permissions").
 		First(&user, targetUserID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{
@@ -238,15 +280,39 @@ func (h *SecureUserHandler) GetUser(c *gin.Context) {
 			Order("created_at desc").Limit(1).Pluck("balance", &diamondBalance)
 	}
 
+	// Convert roles to secure format
+	secureRoles := make([]SecureRoleResponse, len(user.Roles))
+	for i, role := range user.Roles {
+		secureRoles[i] = SecureRoleResponse{
+			ID:          role.ID,
+			Name:        role.Name,
+			Description: role.Description,
+		}
+	}
+
+	// Convert permissions to secure format
+	securePermissions := make([]SecurePermissionResponse, len(user.Permissions))
+	for i, permission := range user.Permissions {
+		securePermissions[i] = SecurePermissionResponse{
+			ID:          permission.ID,
+			Name:        permission.Name,
+			Description: permission.Description,
+			Resource:    permission.Resource,
+			Action:      permission.Action,
+		}
+	}
+
 	// Create secure response with limited data exposure
 	userResponse := SecureUserResponse{
-		ID:        user.ID,
-		Username:  user.Username,
-		FirstName: user.FirstName,
-		LastName:  user.LastName,
-		IsActive:  user.IsActive,
-		CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		RequestID: requestID.(string),
+		ID:          user.ID,
+		Username:    user.Username,
+		FirstName:   user.FirstName,
+		LastName:    user.LastName,
+		IsActive:    user.IsActive,
+		CreatedAt:   user.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		Roles:       secureRoles,
+		Permissions: securePermissions,
+		RequestID:   requestID.(string),
 	}
 
 	// Only include sensitive data for authorized access
@@ -517,69 +583,383 @@ func (h *SecureUserHandler) hasAdminPermission(userID uint) bool {
 
 // AssignRoles handles POST /api/users/:id/roles with admin authorization
 func (h *SecureUserHandler) AssignRoles(c *gin.Context) {
+	requestID := c.GetString("request_id")
+
 	userID, err := h.validator.ValidateIDParam(c, "id")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success":    false,
+			"error":      "invalid user ID",
+			"request_id": requestID,
+		})
 		return
 	}
 
-	// Additional admin permission check
-	if !h.hasAdminPermission(userID) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+	// Check if current user is admin
+	currentUserID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success":    false,
+			"error":      "Authentication required",
+			"request_id": requestID,
+		})
 		return
 	}
 
-	// Placeholder implementation
-	c.JSON(http.StatusOK, gin.H{"message": "roles assigned successfully"})
+	if !h.hasAdminPermission(currentUserID.(uint)) {
+		c.JSON(http.StatusForbidden, gin.H{
+			"success":    false,
+			"error":      "insufficient permissions",
+			"request_id": requestID,
+		})
+		return
+	}
+
+	// Parse request body
+	var req struct {
+		RoleIDs []uint `json:"role_ids"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success":    false,
+			"error":      "Invalid request body",
+			"request_id": requestID,
+		})
+		return
+	}
+
+	// Find the user
+	var user models.User
+	if err := h.db.First(&user, userID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"success":    false,
+				"error":      "User not found",
+				"request_id": requestID,
+			})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success":    false,
+				"error":      "Database error",
+				"request_id": requestID,
+			})
+		}
+		return
+	}
+
+	// Find the roles
+	var roles []models.Role
+	if err := h.db.Where("id IN ?", req.RoleIDs).Find(&roles).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success":    false,
+			"error":      "Failed to find roles",
+			"request_id": requestID,
+		})
+		return
+	}
+
+	// Clear existing roles and assign new ones
+	if err := h.db.Model(&user).Association("Roles").Clear(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success":    false,
+			"error":      "Failed to clear existing roles",
+			"request_id": requestID,
+		})
+		return
+	}
+
+	// Assign new roles
+	if len(roles) > 0 {
+		if err := h.db.Model(&user).Association("Roles").Append(roles); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success":    false,
+				"error":      "Failed to assign roles",
+				"request_id": requestID,
+			})
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success":    true,
+		"message":    "roles assigned successfully",
+		"request_id": requestID,
+	})
 }
 
 func (h *SecureUserHandler) AssignPermissions(c *gin.Context) {
+	requestID := c.GetString("request_id")
+
 	userID, err := h.validator.ValidateIDParam(c, "id")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success":    false,
+			"error":      "invalid user ID",
+			"request_id": requestID,
+		})
 		return
 	}
 
-	// Additional admin permission check
-	if !h.hasAdminPermission(userID) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+	// Check if current user is admin
+	currentUserID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success":    false,
+			"error":      "Authentication required",
+			"request_id": requestID,
+		})
 		return
 	}
 
-	// Placeholder implementation
-	c.JSON(http.StatusOK, gin.H{"message": "permissions assigned successfully"})
+	if !h.hasAdminPermission(currentUserID.(uint)) {
+		c.JSON(http.StatusForbidden, gin.H{
+			"success":    false,
+			"error":      "insufficient permissions",
+			"request_id": requestID,
+		})
+		return
+	}
+
+	// Parse request body
+	var req struct {
+		PermissionIDs []uint `json:"permission_ids"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success":    false,
+			"error":      "Invalid request body",
+			"request_id": requestID,
+		})
+		return
+	}
+
+	// Find the user
+	var user models.User
+	if err := h.db.First(&user, userID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"success":    false,
+				"error":      "User not found",
+				"request_id": requestID,
+			})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success":    false,
+				"error":      "Database error",
+				"request_id": requestID,
+			})
+		}
+		return
+	}
+
+	// Find the permissions
+	var permissions []models.Permission
+	if err := h.db.Where("id IN ?", req.PermissionIDs).Find(&permissions).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success":    false,
+			"error":      "Failed to find permissions",
+			"request_id": requestID,
+		})
+		return
+	}
+
+	// Clear existing permissions and assign new ones
+	if err := h.db.Model(&user).Association("Permissions").Clear(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success":    false,
+			"error":      "Failed to clear existing permissions",
+			"request_id": requestID,
+		})
+		return
+	}
+
+	// Assign new permissions
+	if len(permissions) > 0 {
+		if err := h.db.Model(&user).Association("Permissions").Append(permissions); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success":    false,
+				"error":      "Failed to assign permissions",
+				"request_id": requestID,
+			})
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success":    true,
+		"message":    "permissions assigned successfully",
+		"request_id": requestID,
+	})
 }
 
 func (h *SecureUserHandler) GetUserPermissions(c *gin.Context) {
-	_, err := h.validator.ValidateIDParam(c, "id")
+	requestID := c.GetString("request_id")
+
+	userID, err := h.validator.ValidateIDParam(c, "id")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success":    false,
+			"error":      "invalid user ID",
+			"request_id": requestID,
+		})
 		return
 	}
 
-	// Placeholder implementation - return empty permissions list for now
-	c.JSON(http.StatusOK, gin.H{"permissions": []string{}})
+	// Check if current user is admin or accessing own permissions
+	currentUserID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success":    false,
+			"error":      "Authentication required",
+			"request_id": requestID,
+		})
+		return
+	}
+
+	if currentUserID.(uint) != userID && !h.hasAdminPermission(currentUserID.(uint)) {
+		c.JSON(http.StatusForbidden, gin.H{
+			"success":    false,
+			"error":      "insufficient permissions",
+			"request_id": requestID,
+		})
+		return
+	}
+
+	// Find user with permissions
+	var user models.User
+	if err := h.db.Preload("Permissions").First(&user, userID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"success":    false,
+				"error":      "User not found",
+				"request_id": requestID,
+			})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success":    false,
+				"error":      "Database error",
+				"request_id": requestID,
+			})
+		}
+		return
+	}
+
+	// Convert permissions to secure format
+	securePermissions := make([]SecurePermissionResponse, len(user.Permissions))
+	for i, permission := range user.Permissions {
+		securePermissions[i] = SecurePermissionResponse{
+			ID:          permission.ID,
+			Name:        permission.Name,
+			Description: permission.Description,
+			Resource:    permission.Resource,
+			Action:      permission.Action,
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success":    true,
+		"data":       gin.H{"permissions": securePermissions},
+		"request_id": requestID,
+	})
 }
 
 func (h *SecureUserHandler) RemoveUserPermission(c *gin.Context) {
+	requestID := c.GetString("request_id")
+
 	userID, err := h.validator.ValidateIDParam(c, "id")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success":    false,
+			"error":      "invalid user ID",
+			"request_id": requestID,
+		})
 		return
 	}
 
 	permissionID, err := h.validator.ValidateIDParam(c, "permission_id")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid permission ID"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success":    false,
+			"error":      "invalid permission ID",
+			"request_id": requestID,
+		})
 		return
 	}
 
-	// Additional admin permission check
-	if !h.hasAdminPermission(userID) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+	// Check if current user is admin
+	currentUserID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success":    false,
+			"error":      "Authentication required",
+			"request_id": requestID,
+		})
 		return
 	}
 
-	// Placeholder implementation
-	c.JSON(http.StatusOK, gin.H{"message": "permission removed successfully", "permission_id": permissionID})
+	if !h.hasAdminPermission(currentUserID.(uint)) {
+		c.JSON(http.StatusForbidden, gin.H{
+			"success":    false,
+			"error":      "insufficient permissions",
+			"request_id": requestID,
+		})
+		return
+	}
+
+	// Find the user
+	var user models.User
+	if err := h.db.First(&user, userID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"success":    false,
+				"error":      "User not found",
+				"request_id": requestID,
+			})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success":    false,
+				"error":      "Database error",
+				"request_id": requestID,
+			})
+		}
+		return
+	}
+
+	// Find the permission
+	var permission models.Permission
+	if err := h.db.First(&permission, permissionID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"success":    false,
+				"error":      "Permission not found",
+				"request_id": requestID,
+			})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success":    false,
+				"error":      "Database error",
+				"request_id": requestID,
+			})
+		}
+		return
+	}
+
+	// Remove the permission from the user
+	if err := h.db.Model(&user).Association("Permissions").Delete(&permission); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success":    false,
+			"error":      "Failed to remove permission",
+			"request_id": requestID,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success":       true,
+		"message":       "permission removed successfully",
+		"permission_id": permissionID,
+		"request_id":    requestID,
+	})
 }

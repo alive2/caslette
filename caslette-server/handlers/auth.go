@@ -35,13 +35,20 @@ type SecureAuthResponse struct {
 }
 
 type SecureUser struct {
-	ID        uint   `json:"id"`
-	Username  string `json:"username"`
-	Email     string `json:"email"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	IsActive  bool   `json:"is_active"`
+	ID        uint       `json:"id"`
+	Username  string     `json:"username"`
+	Email     string     `json:"email"`
+	FirstName string     `json:"first_name"`
+	LastName  string     `json:"last_name"`
+	IsActive  bool       `json:"is_active"`
+	Roles     []UserRole `json:"roles"`
 	// Note: Password and sensitive data excluded
+}
+
+type UserRole struct {
+	ID          uint   `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
 
 func NewSecureAuthHandler(db *gorm.DB, authService *auth.AuthService) *SecureAuthHandler {
@@ -278,6 +285,16 @@ func (h *SecureAuthHandler) Login(c *gin.Context) {
 	}
 
 	// Return secure response
+	// Convert roles to secure format
+	secureRoles := make([]UserRole, len(user.Roles))
+	for i, role := range user.Roles {
+		secureRoles[i] = UserRole{
+			ID:          role.ID,
+			Name:        role.Name,
+			Description: role.Description,
+		}
+	}
+
 	secureUser := SecureUser{
 		ID:        user.ID,
 		Username:  user.Username,
@@ -285,6 +302,7 @@ func (h *SecureAuthHandler) Login(c *gin.Context) {
 		FirstName: user.FirstName,
 		LastName:  user.LastName,
 		IsActive:  user.IsActive,
+		Roles:     secureRoles,
 	}
 
 	c.JSON(http.StatusOK, SecureAuthResponse{
@@ -319,6 +337,16 @@ func (h *SecureAuthHandler) GetProfile(c *gin.Context) {
 	h.db.Model(&models.Diamond{}).Where("user_id = ?", userID).Order("created_at desc").Limit(1).Pluck("balance", &currentBalance)
 
 	// Return secure response
+	// Convert roles to secure format
+	secureRoles := make([]UserRole, len(user.Roles))
+	for i, role := range user.Roles {
+		secureRoles[i] = UserRole{
+			ID:          role.ID,
+			Name:        role.Name,
+			Description: role.Description,
+		}
+	}
+
 	secureUser := SecureUser{
 		ID:        user.ID,
 		Username:  user.Username,
@@ -326,6 +354,7 @@ func (h *SecureAuthHandler) GetProfile(c *gin.Context) {
 		FirstName: user.FirstName,
 		LastName:  user.LastName,
 		IsActive:  user.IsActive,
+		Roles:     secureRoles,
 	}
 
 	response := gin.H{

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"caslette-server/models"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -97,9 +98,61 @@ func (h *SecureDiamondHandler) DeductDiamonds(c *gin.Context) {
 }
 
 func (h *SecureDiamondHandler) GetAllTransactions(c *gin.Context) {
-	// Placeholder implementation - return empty transactions list for now
+	requestID, _ := c.Get("request_id")
+
+	// Parse pagination parameters
+	page := 1
+	limit := 50
+
+	if pageStr := c.Query("page"); pageStr != "" {
+		if p, err := h.validator.ValidatePositiveInt(pageStr, "page"); err == nil {
+			page = p
+		}
+	}
+
+	if limitStr := c.Query("limit"); limitStr != "" {
+		if l, err := h.validator.ValidatePositiveInt(limitStr, "limit"); err == nil && l <= 100 {
+			limit = l
+		}
+	}
+
+	// Calculate offset
+	offset := (page - 1) * limit
+
+	// Get transactions with pagination
+	var transactions []models.Diamond
+	var total int64
+
+	// Count total transactions
+	h.db.Model(&models.Diamond{}).Count(&total)
+
+	// Fetch transactions with user info
+	if err := h.db.Preload("User").
+		Order("created_at desc").
+		Limit(limit).
+		Offset(offset).
+		Find(&transactions).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":      "Failed to fetch transactions",
+			"request_id": requestID,
+		})
+		return
+	}
+
+	// Calculate pagination info
+	totalPages := (int(total) + limit - 1) / limit
+
 	c.JSON(http.StatusOK, gin.H{
-		"transactions": []interface{}{},
-		"total":        0,
+		"data": gin.H{
+			"transactions": transactions,
+			"pagination": gin.H{
+				"page":        page,
+				"limit":       limit,
+				"total":       total,
+				"total_pages": totalPages,
+			},
+		},
+		"success":    true,
+		"request_id": requestID,
 	})
 }

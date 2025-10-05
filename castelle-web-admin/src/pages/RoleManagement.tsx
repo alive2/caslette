@@ -54,7 +54,7 @@ const RoleManagement: React.FC = () => {
       console.log("Roles response:", response);
       setState((prev) => ({
         ...prev,
-        roles: response.roles || response || [],
+        roles: response.data?.roles || [],
         loading: false,
       }));
     } catch (error) {
@@ -70,7 +70,7 @@ const RoleManagement: React.FC = () => {
       console.log("Permissions response:", response);
       setState((prev) => ({
         ...prev,
-        permissions: response.permissions || response || [],
+        permissions: response.data?.permissions || [],
       }));
     } catch (error) {
       console.error("Failed to fetch permissions:", error);
