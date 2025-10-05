@@ -12,30 +12,84 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
+  bool _hasTriedToFetchBalance = false;
+
   @override
   void initState() {
     super.initState();
+    // Use a delayed callback to ensure all providers are initialized
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initializeData();
+      _delayedInitialization();
     });
   }
 
-  void _initializeData() {
+  void _delayedInitialization() async {
+    // Wait a bit for auth to complete
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    final authNotifier = ref.read(authProvider.notifier);
+    final currentUser = authNotifier.currentUser;
+    final authState = ref.read(authProvider);
+
+    print(
+      '_delayedInitialization: authState=$authState, currentUser=$currentUser',
+    );
+
+    if (currentUser != null && authState == AuthState.authenticated) {
+      print('User already authenticated, fetching balance after delay');
+      _fetchBalanceIfAuthenticated();
+      _hasTriedToFetchBalance = true;
+    } else {
+      print('User not authenticated yet, will wait for auth state change');
+    }
+  }
+
+  void _fetchBalanceIfAuthenticated() {
     final authNotifier = ref.read(authProvider.notifier);
     final currentUser = authNotifier.currentUser;
 
     if (currentUser != null) {
+      print('Fetching balance for user: ${currentUser.id}');
       ref
           .read(diamondProvider.notifier)
-          .fetchBalanceFromAPI(currentUser.id, currentUser.token);
+          .fetchBalanceFromWebSocket(currentUser.id);
+    } else {
+      print('User not authenticated, skipping balance fetch');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final diamondState = ref.watch(diamondProvider);
+    final authState = ref.watch(authProvider);
     final authNotifier = ref.read(authProvider.notifier);
     final currentUser = authNotifier.currentUser;
+
+    print(
+      'HomeScreen build: authState=$authState, currentUser=$currentUser, hasTriedToFetchBalance=$_hasTriedToFetchBalance, diamondState.isLoading=${diamondState.isLoading}',
+    );
+
+    // Listen for auth state changes and fetch balance when authenticated
+    ref.listen<AuthState>(authProvider, (previous, next) {
+      print('Auth state changed: $previous -> $next');
+      if (next == AuthState.authenticated && !_hasTriedToFetchBalance) {
+        print('Auth state is authenticated, fetching balance...');
+        _fetchBalanceIfAuthenticated();
+        _hasTriedToFetchBalance = true;
+      }
+    });
+
+    // Also check if we should fetch balance on each build (fallback)
+    if (authState == AuthState.authenticated &&
+        currentUser != null &&
+        !_hasTriedToFetchBalance &&
+        !diamondState.isLoading) {
+      print('Fallback: Fetching balance in build method');
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _fetchBalanceIfAuthenticated();
+        _hasTriedToFetchBalance = true;
+      });
+    }
 
     return Scaffold(
       body: Container(

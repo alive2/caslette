@@ -120,6 +120,42 @@ class WebSocketController extends StateNotifier<AsyncValue<void>> {
     await connect();
     await authenticateWithStoredToken();
   }
+
+  // Get user balance via WebSocket
+  Future<Map<String, dynamic>?> getUserBalance(String userId) async {
+    try {
+      log('WebSocketController: getUserBalance called for userId: $userId');
+      final response = await _service.getUserBalance(userId);
+      if (response.success) {
+        log('WebSocketController: getUserBalance successful');
+        return response.data as Map<String, dynamic>?;
+      } else {
+        log('WebSocketController: getUserBalance failed: ${response.error}');
+        return null;
+      }
+    } catch (e) {
+      log('WebSocketController: getUserBalance error: $e');
+      return null;
+    }
+  }
+
+  // Get user profile via WebSocket
+  Future<Map<String, dynamic>?> getUserProfile(String userId) async {
+    try {
+      log('WebSocketController: getUserProfile called for userId: $userId');
+      final response = await _service.getUserProfile(userId);
+      if (response.success) {
+        log('WebSocketController: getUserProfile successful');
+        return response.data as Map<String, dynamic>?;
+      } else {
+        log('WebSocketController: getUserProfile failed: ${response.error}');
+        return null;
+      }
+    } catch (e) {
+      log('WebSocketController: getUserProfile error: $e');
+      return null;
+    }
+  }
 }
 
 // WebSocket controller provider

@@ -283,7 +283,9 @@ class WebSocketService {
   // Authenticate with JWT token
   Future<WebSocketResponse> authenticate(String token) async {
     log('WebSocket authenticate called with token length: ${token.length}');
-    print('WebSocket AUTHENTICATE called with token: ${token.substring(0, 20)}...');
+    print(
+      'WebSocket AUTHENTICATE called with token: ${token.substring(0, 20)}...',
+    );
     log('Current connection state: $isConnected');
     print('Current connection state: $isConnected');
     print('Channel is null: ${_channel == null}');
@@ -298,7 +300,9 @@ class WebSocketService {
     log(
       'Authentication response received: success=${response.success}, error=${response.error}',
     );
-    print('Authentication response: success=${response.success}, error=${response.error}');
+    print(
+      'Authentication response: success=${response.success}, error=${response.error}',
+    );
 
     if (response.success) {
       final data = response.data as Map<String, dynamic>?;
@@ -339,6 +343,26 @@ class WebSocketService {
       'room': room,
       'message': message,
     });
+  }
+
+  // Get user balance via WebSocket
+  Future<WebSocketResponse> getUserBalance(String userId) async {
+    log('WebSocketService: getUserBalance called for userId: $userId');
+    final response = await sendRequest('get_user_balance', {'userId': userId});
+    log(
+      'WebSocketService: getUserBalance response - success: ${response.success}, error: ${response.error}',
+    );
+    return response;
+  }
+
+  // Get user profile via WebSocket
+  Future<WebSocketResponse> getUserProfile(String userId) async {
+    log('WebSocketService: getUserProfile called for userId: $userId');
+    final response = await sendRequest('get_user_profile', {'userId': userId});
+    log(
+      'WebSocketService: getUserProfile response - success: ${response.success}, error: ${response.error}',
+    );
+    return response;
   }
 
   // Send request and wait for response
@@ -412,7 +436,9 @@ class WebSocketService {
       final message = WebSocketMessage.fromJson(json);
 
       log('WebSocket received: ${message.type} - $messageData');
-      print('WebSocket PARSED MESSAGE: type=${message.type}, requestId=${message.requestId}');
+      print(
+        'WebSocket PARSED MESSAGE: type=${message.type}, requestId=${message.requestId}',
+      );
 
       // Handle responses to requests
       if (message.requestId != null &&
@@ -421,7 +447,9 @@ class WebSocketService {
         final completer = _pendingRequests.remove(message.requestId!);
         if (completer != null && !completer.isCompleted) {
           final response = WebSocketResponse.fromMessage(message);
-          print('WebSocket: Completing request ${message.requestId} with success=${response.success}');
+          print(
+            'WebSocket: Completing request ${message.requestId} with success=${response.success}',
+          );
           completer.complete(response);
         }
         return;

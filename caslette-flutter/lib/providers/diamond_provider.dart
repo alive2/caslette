@@ -1,5 +1,5 @@
 import "package:flutter_riverpod/flutter_riverpod.dart";
-import "../services/api_service.dart";
+import "../services/websocket/websocket_providers.dart";
 
 class DiamondState {
   final int balance;
@@ -43,27 +43,60 @@ class DiamondNotifier extends StateNotifier<DiamondState> {
     }
   }
 
-  Future<void> fetchBalanceFromAPI(String userId, String token) async {
+  Future<void> fetchBalanceFromWebSocket(String userId) async {
+    print(
+      'DiamondProvider: fetchBalanceFromWebSocket called for userId: $userId',
+    );
     state = state.copyWith(isLoading: true);
 
     try {
-      final apiService = _ref.read(apiServiceProvider);
-      final result = await apiService.getBalance(userId, token);
+      final webSocketService = _ref.read(webSocketServiceProvider);
+      print('DiamondProvider: Calling webSocketService.getUserBalance...');
+      final response = await webSocketService.getUserBalance(userId);
+      print(
+        'DiamondProvider: Received response - success: ${response.success}, data: ${response.data}',
+      );
 
-      if (result != null && result.containsKey('current_balance')) {
-        state = state.copyWith(
-          balance: result['current_balance'] as int,
-          isLoading: false,
-        );
+      if (response.success && response.data != null) {
+        final data = response.data as Map<String, dynamic>;
+        if (data.containsKey('current_balance')) {
+          final balance = data['current_balance'] as int;
+          print('DiamondProvider: Setting balance to $balance');
+          state = state.copyWith(
+            balance: balance,
+            isLoading: false,
+            error: null,
+          );
+        } else {
+          print(
+            'DiamondProvider: Invalid balance data - missing current_balance key',
+          );
+          state = state.copyWith(
+            isLoading: false,
+            error: 'Invalid balance data received',
+          );
+        }
       } else {
+        print('DiamondProvider: Request failed - error: ${response.error}');
         state = state.copyWith(
           isLoading: false,
-          error: 'Failed to fetch balance',
+          error: response.error ?? 'Failed to fetch balance via WebSocket',
         );
       }
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      print('DiamondProvider: Exception caught: $e');
+      state = state.copyWith(
+        isLoading: false,
+        error: 'WebSocket error: ${e.toString()}',
+      );
     }
+  }
+
+  // Keep the old method for backward compatibility, but mark it as deprecated
+  @Deprecated('Use fetchBalanceFromWebSocket instead')
+  Future<void> fetchBalanceFromAPI(String userId, String token) async {
+    // For now, just call the WebSocket version
+    await fetchBalanceFromWebSocket(userId);
   }
 }
 
