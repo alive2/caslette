@@ -2,6 +2,7 @@ import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:shared_preferences/shared_preferences.dart";
 import "../services/api_service.dart";
 import "socket_provider.dart";
+import "../services/websocket/websocket_providers.dart";
 
 enum AuthState { unauthenticated, authenticated, loading }
 
@@ -100,6 +101,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final webSocketController = _ref.read(
         webSocketControllerProvider.notifier,
       );
+
+      // Re-enable WebSocket connections in case user was previously logged out
+      final webSocketService = _ref.read(webSocketServiceProvider);
+      webSocketService.enableReconnection();
 
       // Connect to WebSocket server
       await webSocketController.connect();

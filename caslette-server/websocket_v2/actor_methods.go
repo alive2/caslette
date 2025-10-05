@@ -59,19 +59,27 @@ func (h *ActorHub) actorUnregisterConnection(conn *Connection, response chan int
 
 // actorProcessMessage processes an incoming message (actor method)
 func (h *ActorHub) actorProcessMessage(conn *Connection, msg *Message, response chan interface{}) {
-	// Check rate limiting first
-	if err := h.checkRateLimit(conn.ID); err != nil {
-		log.Printf("ActorHub: Rate limit exceeded for connection %s: %v", conn.ID, err)
-		errorResponse := &Message{
-			Type:      "error",
-			RequestID: msg.RequestID,
-			Error:     err.Error(),
-			Success:   false,
+	log.Printf("ActorHub: actorProcessMessage started for connection %s, message type: %s", conn.ID, msg.Type)
+
+	// Check rate limiting first - call actor method directly to avoid deadlock
+	log.Printf("ActorHub: About to check rate limit for connection %s", conn.ID)
+	rateLimitResponse := make(chan interface{}, 1)
+	h.actorCheckRateLimit(conn.ID, rateLimitResponse)
+	if rateLimitResult := <-rateLimitResponse; rateLimitResult != nil {
+		if err, ok := rateLimitResult.(error); ok {
+			log.Printf("ActorHub: Rate limit exceeded for connection %s: %v", conn.ID, err)
+			errorResponse := &Message{
+				Type:      "error",
+				RequestID: msg.RequestID,
+				Error:     err.Error(),
+				Success:   false,
+			}
+			conn.SendMessage(errorResponse)
+			response <- err
+			return
 		}
-		conn.SendMessage(errorResponse)
-		response <- err
-		return
 	}
+	log.Printf("ActorHub: Rate limit check passed for connection %s", conn.ID)
 
 	ctx := context.Background()
 	log.Printf("ActorHub: Processing message type: %s from connection %s (UserID: %s)", msg.Type, conn.ID, conn.UserID)
@@ -85,6 +93,11 @@ func (h *ActorHub) actorProcessMessage(conn *Connection, msg *Message, response 
 
 	// Handle built-in message types with input validation
 	switch msg.Type {
+	case "logout":
+		h.actorHandleLogout(conn, msg)
+		response <- nil
+		return
+
 	case "test_echo":
 		log.Printf("ActorHub: Received test_echo, sending test_echo_response")
 		echoResponse := &Message{
@@ -245,6 +258,33 @@ func (h *ActorHub) actorHandleAuth(conn *Connection, msg *Message) {
 		}
 		conn.SendMessage(response)
 	}
+}
+
+// actorHandleLogout handles user logout (actor method)
+func (h *ActorHub) actorHandleLogout(conn *Connection, msg *Message) {
+	log.Printf("ActorHub: handleLogout called for connection %s (UserID: %s)", conn.ID, conn.UserID)
+
+	// Clear user authentication
+	if conn.UserID != "" {
+		// Remove from user mapping
+		delete(h.users, conn.UserID)
+		log.Printf("ActorHub: Removed user %s from user mapping", conn.UserID)
+	}
+
+	// Clear connection authentication info
+	conn.UserID = ""
+	conn.Username = ""
+
+	// Send logout response
+	response := &Message{
+		Type:      "logout_response",
+		RequestID: msg.RequestID,
+		Success:   true,
+		Data:      map[string]interface{}{"message": "Logged out successfully"},
+	}
+	conn.SendMessage(response)
+
+	log.Printf("ActorHub: User logged out from connection %s", conn.ID)
 }
 
 // actorHandleCreateRoom handles room creation (actor method)

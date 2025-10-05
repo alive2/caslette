@@ -139,12 +139,14 @@ func (h *ActorHub) actorLoop() {
 
 // handleActorMessage processes a message sent to the actor
 func (h *ActorHub) handleActorMessage(msg HubMessage) {
+	log.Printf("ActorHub: handleActorMessage called with type: %s", msg.Type)
 	switch msg.Type {
 	case "register":
 		h.actorRegisterConnection(msg.Connection, msg.Response)
 	case "unregister":
 		h.actorUnregisterConnection(msg.Connection, msg.Response)
 	case "process_message":
+		log.Printf("ActorHub: About to call actorProcessMessage for connection %s", msg.Connection.ID)
 		h.actorProcessMessage(msg.Connection, msg.Message, msg.Response)
 	case "join_room":
 		h.actorJoinRoom(msg.Connection.ID, msg.Room, msg.Response)
@@ -279,6 +281,7 @@ func (h *ActorHub) Unregister(conn *Connection) {
 
 // ProcessMessage processes an incoming message
 func (h *ActorHub) ProcessMessage(conn *Connection, msg *Message) {
+	log.Printf("ActorHub: ProcessMessage called for connection %s, message type: %s", conn.ID, msg.Type)
 	response := make(chan interface{})
 	h.hubChannel <- HubMessage{
 		Type:       "process_message",

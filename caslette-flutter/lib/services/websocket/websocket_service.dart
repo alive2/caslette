@@ -49,49 +49,49 @@ class WebSocketConnectionInfo {
 // WebSocket message
 class WebSocketMessage {
   final String type;
-  final String? event;
   final dynamic data;
   final String? room;
+  final String? event;
   final String? requestId;
-  final bool? success;
+  final bool success;
   final String? error;
   final int timestamp;
 
-  WebSocketMessage({
+  const WebSocketMessage({
     required this.type,
-    this.event,
     this.data,
     this.room,
+    this.event,
     this.requestId,
-    this.success,
+    this.success = false,
     this.error,
-    required this.timestamp,
+    this.timestamp = 0,
   });
-
-  Map<String, dynamic> toJson() {
-    final Map<String, dynamic> json = {'type': type, 'timestamp': timestamp};
-
-    if (event != null) json['event'] = event;
-    if (data != null) json['data'] = data;
-    if (room != null) json['room'] = room;
-    if (requestId != null) json['requestId'] = requestId;
-    if (success != null) json['success'] = success;
-    if (error != null) json['error'] = error;
-
-    return json;
-  }
 
   factory WebSocketMessage.fromJson(Map<String, dynamic> json) {
     return WebSocketMessage(
       type: json['type'] ?? '',
-      event: json['event'],
       data: json['data'],
       room: json['room'],
+      event: json['event'],
       requestId: json['requestId'],
-      success: json['success'],
+      success: json['success'] ?? false,
       error: json['error'],
       timestamp: json['timestamp'] ?? DateTime.now().millisecondsSinceEpoch,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'type': type,
+      'data': data,
+      'room': room,
+      'event': event,
+      'requestId': requestId,
+      'success': success,
+      'error': error,
+      'timestamp': timestamp,
+    };
   }
 }
 
@@ -111,20 +111,23 @@ class WebSocketResponse {
   final bool success;
   final dynamic data;
   final String? error;
+  final String? requestId;
 
   const WebSocketResponse({
     required this.type,
     required this.success,
     this.data,
     this.error,
+    this.requestId,
   });
 
   factory WebSocketResponse.fromMessage(WebSocketMessage message) {
     return WebSocketResponse(
       type: message.type,
-      success: message.success ?? false,
+      success: message.success,
       data: message.data,
       error: message.error,
+      requestId: message.requestId,
     );
   }
 }
@@ -150,6 +153,8 @@ class WebSocketService {
   int _reconnectionAttempts = 0;
   static const int _maxReconnectionAttempts = 10;
   static const Duration _initialReconnectionDelay = Duration(seconds: 1);
+  bool _intentionalDisconnect = false; // Track if disconnect was intentional
+  bool _allowReconnection = true; // Control whether reconnection is allowed
 
   WebSocketConnectionInfo _connectionInfo = const WebSocketConnectionInfo(
     state: WebSocketConnectionState.disconnected,
@@ -176,29 +181,44 @@ class WebSocketService {
 
   // Connect to WebSocket server
   Future<void> connect({String? customUrl}) async {
+    if (!_allowReconnection) {
+      log('WebSocket connection not allowed - user logged out');
+      return;
+    }
+
     if (isConnected) {
       log('WebSocket already connected');
       return;
     }
 
     try {
+      // Cancel any pending reconnection attempts
+      _reconnectionTimer?.cancel();
+      _reconnectionTimer = null;
+
+      // Reset intentional disconnect flag for new connections
+      _intentionalDisconnect = false;
+
       _updateConnectionState(WebSocketConnectionState.connecting);
       _reconnectionAttempts = 0;
 
       final uri = Uri.parse(customUrl ?? _baseUrl);
+      log('WebSocket connecting to: $uri');
       _channel = WebSocketChannel.connect(uri);
 
-      // Listen to messages
+      // Start listening to messages immediately
       _channel!.stream.listen(
         _handleMessage,
         onError: _handleError,
         onDone: _handleDisconnection,
       );
 
-      // Wait for connection to be established
+      // Wait for connection to be established (server sends "connected" message)
       await _waitForConnection(timeout: const Duration(seconds: 10));
+
+      log('WebSocket connected successfully');
     } catch (e) {
-      log('WebSocket connection error: $e');
+      log('WebSocket connection failed: $e');
       _updateConnectionState(
         WebSocketConnectionState.error,
         error: e.toString(),
@@ -210,6 +230,24 @@ class WebSocketService {
 
   // Disconnect from WebSocket server
   Future<void> disconnect() async {
+    log('WebSocket manually disconnecting');
+
+    // Mark this as an intentional disconnect and disable reconnection
+    _intentionalDisconnect = true;
+    _allowReconnection = false;
+
+    // Send logout message to server if connected and authenticated
+    if (isConnected && _connectionInfo.isAuthenticated) {
+      try {
+        log('Sending logout message to server');
+        sendMessage('logout', {});
+        // Give a brief moment for the message to be sent
+        await Future.delayed(const Duration(milliseconds: 100));
+      } catch (e) {
+        log('Error sending logout message: $e');
+      }
+    }
+
     _reconnectionTimer?.cancel();
     _reconnectionTimer = null;
 
@@ -218,7 +256,13 @@ class WebSocketService {
       _channel = null;
     }
 
-    _updateConnectionState(WebSocketConnectionState.disconnected);
+    // Update connection state and clear authentication
+    _updateConnectionState(
+      WebSocketConnectionState.disconnected,
+      isAuthenticated: false,
+      userID: null,
+      username: null,
+    );
 
     // Clear pending requests
     for (final completer in _pendingRequests.values) {
@@ -229,15 +273,32 @@ class WebSocketService {
     _pendingRequests.clear();
   }
 
+  // Re-enable WebSocket connections (call when user logs in)
+  void enableReconnection() {
+    log('WebSocket reconnection re-enabled');
+    _allowReconnection = true;
+    _intentionalDisconnect = false;
+  }
+
   // Authenticate with JWT token
   Future<WebSocketResponse> authenticate(String token) async {
     log('WebSocket authenticate called with token length: ${token.length}');
+    print('WebSocket AUTHENTICATE called with token: ${token.substring(0, 20)}...');
     log('Current connection state: $isConnected');
+    print('Current connection state: $isConnected');
+    print('Channel is null: ${_channel == null}');
 
+    // Check if channel exists (connection is established)
+    if (_channel == null) {
+      throw Exception('WebSocket channel not established');
+    }
+
+    print('WebSocket sending auth request...');
     final response = await sendRequest('auth', {'token': token});
     log(
       'Authentication response received: success=${response.success}, error=${response.error}',
     );
+    print('Authentication response: success=${response.success}, error=${response.error}');
 
     if (response.success) {
       final data = response.data as Map<String, dynamic>?;
@@ -259,11 +320,10 @@ class WebSocketService {
 
   // Join a room
   Future<WebSocketResponse> joinRoom(String room) async {
-    print('WebSocketService: joinRoom called for room: $room');
-    print('WebSocketService: About to send join_room request...');
+    log('WebSocketService: joinRoom called for room: $room');
     final response = await sendRequest('join_room', room);
-    print(
-      'WebSocketService: joinRoom response received - type: ${response.type}, success: ${response.success}, error: ${response.error}, data: ${response.data}',
+    log(
+      'WebSocketService: joinRoom response - success: ${response.success}, error: ${response.error}',
     );
     return response;
   }
@@ -281,7 +341,7 @@ class WebSocketService {
     });
   }
 
-  // Send a request and wait for response
+  // Send request and wait for response
   Future<WebSocketResponse> sendRequest(String type, dynamic data) async {
     if (!isConnected) {
       throw Exception('WebSocket not connected');
@@ -331,61 +391,37 @@ class WebSocketService {
     _sendMessage(message);
   }
 
-  // Register an event handler
-  void on(String eventType, Function(WebSocketEvent) handler) {
-    _eventHandlers[eventType] = handler;
-  }
-
-  // Remove an event handler
-  void off(String eventType) {
-    _eventHandlers.remove(eventType);
-  }
-
-  // Manual reconnection
-  Future<void> reconnect() async {
-    await disconnect();
-    await connect();
-  }
-
-  // Dispose resources
-  void dispose() {
-    disconnect();
-    _connectionController.close();
-    _eventController.close();
-  }
-
   // Private methods
   void _sendMessage(WebSocketMessage message) {
-    if (_channel != null) {
-      final jsonString = jsonEncode(message.toJson());
-      _channel!.sink.add(jsonString);
-      log('WebSocket sent: $jsonString');
+    if (_channel == null) {
+      log('Cannot send message: WebSocket channel is null');
+      return;
     }
+
+    final json = jsonEncode(message.toJson());
+    log('WebSocket sending: ${message.type} - $json');
+    print('WebSocket SENDING MESSAGE: ${message.type}');
+    print('WebSocket JSON: $json');
+    _channel!.sink.add(json);
   }
 
   void _handleMessage(dynamic messageData) {
     try {
+      print('WebSocket RAW MESSAGE RECEIVED: $messageData');
       final Map<String, dynamic> json = jsonDecode(messageData);
       final message = WebSocketMessage.fromJson(json);
 
-      print('WebSocket received: ${message.type} - $messageData');
+      log('WebSocket received: ${message.type} - $messageData');
+      print('WebSocket PARSED MESSAGE: type=${message.type}, requestId=${message.requestId}');
 
       // Handle responses to requests
       if (message.requestId != null &&
           _pendingRequests.containsKey(message.requestId)) {
-        print(
-          'WebSocket: Processing response for request ${message.requestId}',
-        );
-        print(
-          'WebSocket: Response type=${message.type}, success=${message.success}, error=${message.error}',
-        );
-
+        print('WebSocket: Found pending request for ${message.requestId}');
         final completer = _pendingRequests.remove(message.requestId!);
         if (completer != null && !completer.isCompleted) {
           final response = WebSocketResponse.fromMessage(message);
-          print(
-            'WebSocket: Completing request with response - success: ${response.success}, error: ${response.error}',
-          );
+          print('WebSocket: Completing request ${message.requestId} with success=${response.success}');
           completer.complete(response);
         }
         return;
@@ -394,31 +430,31 @@ class WebSocketService {
       // Handle specific message types
       switch (message.type) {
         case 'connected':
+          print('WebSocket: Received connected message, updating state');
           _updateConnectionState(WebSocketConnectionState.connected);
           break;
         case 'error':
           log('WebSocket error message: ${message.error}');
           break;
         default:
-          // Handle as event
+          // Handle as event - emit to event stream
           final event = WebSocketEvent(
             type: message.type,
             event: message.event,
             data: message.data,
             room: message.room,
           );
-
           _eventController.add(event);
 
-          // Call registered handlers
+          // Call specific handler if registered
           final handler = _eventHandlers[message.type];
           if (handler != null) {
             handler(event);
           }
-          break;
       }
     } catch (e) {
       log('Error handling WebSocket message: $e');
+      print('WebSocket MESSAGE HANDLING ERROR: $e');
     }
   }
 
@@ -432,9 +468,24 @@ class WebSocketService {
   }
 
   void _handleDisconnection() {
-    log('WebSocket disconnected');
+    log(
+      'WebSocket disconnected (intentional: $_intentionalDisconnect, allowReconnect: $_allowReconnection)',
+    );
+
+    final wasAuthenticated = _connectionInfo.isAuthenticated;
     _updateConnectionState(WebSocketConnectionState.disconnected);
-    _scheduleReconnection();
+
+    // Only schedule reconnection if allowed and wasn't intentional
+    if (_allowReconnection &&
+        !_intentionalDisconnect &&
+        wasAuthenticated &&
+        _reconnectionTimer == null) {
+      log('WebSocket scheduling reconnection - unintentional disconnect');
+      _scheduleReconnection();
+    } else {
+      log('WebSocket NOT reconnecting');
+      _intentionalDisconnect = false;
+    }
   }
 
   void _updateConnectionState(
@@ -444,6 +495,7 @@ class WebSocketService {
     String? userID,
     String? username,
   }) {
+    log('WebSocket state change: ${_connectionInfo.state} -> $state');
     _connectionInfo = _connectionInfo.copyWith(
       state: state,
       error: error,
@@ -472,7 +524,6 @@ class WebSocketService {
       }
     });
 
-    // Set timeout
     Timer(timeout, () {
       if (!completer.isCompleted) {
         subscription.cancel();
@@ -484,31 +535,48 @@ class WebSocketService {
   }
 
   void _scheduleReconnection() {
-    if (_reconnectionAttempts >= _maxReconnectionAttempts) {
-      log('Max reconnection attempts reached');
+    if (_reconnectionTimer != null ||
+        _reconnectionAttempts >= _maxReconnectionAttempts) {
       return;
     }
 
-    _reconnectionTimer?.cancel();
-
+    _reconnectionAttempts++;
     final delay = Duration(
-      milliseconds:
-          (_initialReconnectionDelay.inMilliseconds *
-                  (1 << _reconnectionAttempts))
-              .clamp(1000, 30000),
+      seconds: _initialReconnectionDelay.inSeconds * _reconnectionAttempts,
     );
 
     log(
-      'Scheduling reconnection in ${delay.inMilliseconds}ms (attempt ${_reconnectionAttempts + 1})',
+      'WebSocket scheduling reconnection attempt $_reconnectionAttempts in ${delay.inSeconds}s',
     );
-
     _updateConnectionState(WebSocketConnectionState.reconnecting);
 
     _reconnectionTimer = Timer(delay, () {
-      _reconnectionAttempts++;
-      connect().catchError((e) {
-        log('Reconnection failed: $e');
-      });
+      _reconnectionTimer = null;
+      if (_connectionInfo.state != WebSocketConnectionState.connected) {
+        log('WebSocket attempting reconnection $_reconnectionAttempts');
+        connect().catchError((e) {
+          log('WebSocket reconnection failed: $e');
+          _scheduleReconnection();
+        });
+      }
     });
+  }
+
+  // Subscribe to events
+  void on(String eventType, Function(WebSocketEvent) handler) {
+    _eventHandlers[eventType] = handler;
+  }
+
+  // Unsubscribe from events
+  void off(String eventType) {
+    _eventHandlers.remove(eventType);
+  }
+
+  // Dispose resources
+  void dispose() {
+    _reconnectionTimer?.cancel();
+    _channel?.sink.close();
+    _connectionController.close();
+    _eventController.close();
   }
 }

@@ -152,7 +152,7 @@ func (c *Connection) readPump() {
 		c.Close()
 	}()
 
-	c.Conn.SetReadLimit(512)
+	c.Conn.SetReadLimit(4096) // Increased from 512 to handle larger messages like JWT tokens
 	c.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 	c.Conn.SetPongHandler(func(string) error {
 		c.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
@@ -168,11 +168,15 @@ func (c *Connection) readPump() {
 			break
 		}
 
+		log.Printf("Connection %s: Received raw message: %s", c.ID, string(messageBytes))
+
 		var msg Message
 		if err := json.Unmarshal(messageBytes, &msg); err != nil {
 			log.Printf("Error unmarshaling message: %v", err)
 			continue
 		}
+
+		log.Printf("Connection %s: Parsed message type: %s, requestId: %s", c.ID, msg.Type, msg.RequestID)
 
 		msg.Timestamp = time.Now().Unix()
 		c.Hub.ProcessMessage(c, &msg)
