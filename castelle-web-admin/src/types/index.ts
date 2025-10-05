@@ -5,6 +5,7 @@ export interface User {
   first_name: string;
   last_name: string;
   is_active: boolean;
+  balance: number;
   created_at: string;
   updated_at: string;
   roles: Role[];

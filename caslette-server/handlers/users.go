@@ -35,6 +35,7 @@ type SecureUserResponse struct {
 	FirstName   string                     `json:"first_name"`
 	LastName    string                     `json:"last_name"`
 	IsActive    bool                       `json:"is_active"`
+	Balance     int64                      `json:"balance"`
 	CreatedAt   string                     `json:"created_at"`
 	Roles       []SecureRoleResponse       `json:"roles"`
 	Permissions []SecurePermissionResponse `json:"permissions"`
@@ -163,6 +164,11 @@ func (h *SecureUserHandler) GetUsers(c *gin.Context) {
 	// Create secure response
 	secureUsers := make([]SecureUserResponse, len(users))
 	for i, user := range users {
+		// Get diamond balance for each user
+		var diamondBalance int64
+		h.db.Model(&models.Diamond{}).Where("user_id = ?", user.ID).
+			Order("created_at desc").Limit(1).Pluck("balance", &diamondBalance)
+
 		// Convert roles to secure format
 		secureRoles := make([]SecureRoleResponse, len(user.Roles))
 		for j, role := range user.Roles {
@@ -192,6 +198,7 @@ func (h *SecureUserHandler) GetUsers(c *gin.Context) {
 			FirstName:   user.FirstName,
 			LastName:    user.LastName,
 			IsActive:    user.IsActive,
+			Balance:     diamondBalance,
 			CreatedAt:   user.CreatedAt.Format("2006-01-02T15:04:05Z"),
 			Roles:       secureRoles,
 			Permissions: securePermissions,
@@ -309,6 +316,7 @@ func (h *SecureUserHandler) GetUser(c *gin.Context) {
 		FirstName:   user.FirstName,
 		LastName:    user.LastName,
 		IsActive:    user.IsActive,
+		Balance:     diamondBalance,
 		CreatedAt:   user.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		Roles:       secureRoles,
 		Permissions: securePermissions,
@@ -324,11 +332,6 @@ func (h *SecureUserHandler) GetUser(c *gin.Context) {
 		"success":    true,
 		"user":       userResponse,
 		"request_id": requestID,
-	}
-
-	// Only include sensitive data for authorized access
-	if targetUserID == currentUserID.(uint) || h.hasAdminPermission(currentUserID.(uint)) {
-		response["diamond_balance"] = diamondBalance
 	}
 
 	c.JSON(http.StatusOK, response)

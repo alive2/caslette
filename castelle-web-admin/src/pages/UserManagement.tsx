@@ -122,6 +122,20 @@ const UserManagement: React.FC = () => {
       mobileLabel: "Status",
     },
     {
+      key: "balance",
+      title: "Balance",
+      sortable: true,
+      render: (_, user) => (
+        <div className="flex items-center">
+          <FaGem className="w-4 h-4 text-yellow-400 mr-2" />
+          <span className="text-yellow-300 font-medium">
+            {user.balance?.toLocaleString() || "0"}
+          </span>
+        </div>
+      ),
+      mobileLabel: "Balance",
+    },
+    {
       key: "roles",
       title: "Roles",
       render: (_, user) => (
