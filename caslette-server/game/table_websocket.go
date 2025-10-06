@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"time"
 )
 
 // WebSocketConnection interface for websocket operations
@@ -54,15 +55,16 @@ type WebSocketMessage struct {
 // GetMessageHandlers returns all table-related message handlers
 func (h *TableWebSocketHandler) GetMessageHandlers() map[string]func(ctx context.Context, conn WebSocketConnection, msg *WebSocketMessage) *WebSocketMessage {
 	return map[string]func(ctx context.Context, conn WebSocketConnection, msg *WebSocketMessage) *WebSocketMessage{
-		"table_create":     h.handleCreateTable,
-		"table_join":       h.handleJoinTable,
-		"table_leave":      h.handleLeaveTable,
-		"table_list":       h.handleListTables,
-		"table_get":        h.handleGetTable,
-		"table_close":      h.handleCloseTable,
-		"table_set_ready":  h.handleSetReady,
-		"table_start_game": h.handleStartGame,
-		"table_get_stats":  h.handleGetStats,
+		"table_create":         h.handleCreateTable,
+		"table_join":           h.handleJoinTable,
+		"table_leave":          h.handleLeaveTable,
+		"table_list":           h.handleListTables,
+		"table_get":            h.handleGetTable,
+		"table_close":          h.handleCloseTable,
+		"table_set_ready":      h.handleSetReady,
+		"table_start_game":     h.handleStartGame,
+		"table_get_stats":      h.handleGetStats,
+		"table_get_game_state": h.handleGetGameState,
 	}
 }
 
@@ -130,19 +132,26 @@ func (h *TableWebSocketHandler) handleJoinTable(ctx context.Context, conn WebSoc
 
 // handleLeaveTable handles table leave requests
 func (h *TableWebSocketHandler) handleLeaveTable(ctx context.Context, conn WebSocketConnection, msg *WebSocketMessage) *WebSocketMessage {
+	log.Printf("Handling table_leave request from user %s", conn.GetUserID())
+
 	var req TableLeaveRequest
 	if err := h.parseMessageData(msg.Data, &req); err != nil {
+		log.Printf("Failed to parse leave table request: %v", err)
 		return h.errorResponse(msg.RequestID, "INVALID_DATA", "Invalid request data: "+err.Error())
 	}
 
 	// Set player info from connection
 	req.PlayerID = conn.GetUserID()
 
+	log.Printf("Leave table request: TableID=%s, PlayerID=%s", req.TableID, req.PlayerID)
+
 	// Leave table
 	if err := h.tableManager.LeaveTable(ctx, &req); err != nil {
+		log.Printf("Failed to leave table: %v", err)
 		return h.errorResponse(msg.RequestID, "LEAVE_FAILED", err.Error())
 	}
 
+	log.Printf("Successfully left table %s", req.TableID)
 	return h.successResponse(msg.RequestID, "table_left", map[string]interface{}{
 		"table_id": req.TableID,
 	})
@@ -315,7 +324,81 @@ func (h *TableWebSocketHandler) handleGetStats(ctx context.Context, conn WebSock
 	return h.successResponse(msg.RequestID, "table_stats", stats)
 }
 
-// Webhook handler implementations (TableWebhookHandler interface)
+// handleGetGameState handles get game state requests
+func (h *TableWebSocketHandler) handleGetGameState(ctx context.Context, conn WebSocketConnection, msg *WebSocketMessage) *WebSocketMessage {
+	log.Printf("Handling table_get_game_state request from user %s", conn.GetUserID())
+
+	var req struct {
+		TableID string `json:"table_id"`
+	}
+	if err := h.parseMessageData(msg.Data, &req); err != nil {
+		log.Printf("Failed to parse get game state request: %v", err)
+		return h.errorResponse(msg.RequestID, "INVALID_DATA", "Invalid request data: "+err.Error())
+	}
+
+	log.Printf("Get game state request: TableID=%s, PlayerID=%s", req.TableID, conn.GetUserID())
+
+	// Add timeout context to prevent deadlocks
+	timeoutCtx, cancel := context.WithTimeout(ctx, time.Second*5)
+	defer cancel()
+
+	// Get table
+	log.Printf("Getting table %s from manager", req.TableID)
+	table, err := h.tableManager.GetTable(req.TableID)
+	if err != nil {
+		log.Printf("Table not found: %v", err)
+		return h.errorResponse(msg.RequestID, "TABLE_NOT_FOUND", err.Error())
+	}
+	log.Printf("Found table %s", req.TableID)
+
+	// Check if user can view game state (player or observer)
+	playerID := conn.GetUserID()
+	log.Printf("Checking access for player %s to table %s", playerID, req.TableID)
+	if !table.IsPlayerAtTable(playerID) && !table.IsObserver(playerID) {
+		log.Printf("Access denied for user %s to table %s", playerID, req.TableID)
+		return h.errorResponse(msg.RequestID, "ACCESS_DENIED", "Access denied")
+	}
+	log.Printf("Access granted for player %s to table %s", playerID, req.TableID)
+
+	// Get game state from engine
+	var gameState map[string]interface{}
+	if table.GameEngine != nil {
+		log.Printf("Getting game state from engine for table %s", req.TableID)
+
+		// Use a channel to handle potential blocking
+		done := make(chan map[string]interface{}, 1)
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("Panic in GetGameState: %v", r)
+					done <- nil
+				}
+			}()
+			done <- table.GameEngine.GetGameState()
+		}()
+
+		select {
+		case gameState = <-done:
+			log.Printf("Got game state from engine")
+		case <-timeoutCtx.Done():
+			log.Printf("Timeout getting game state from engine")
+			return h.errorResponse(msg.RequestID, "TIMEOUT", "Game state request timed out")
+		}
+	} else {
+		log.Printf("No game engine for table %s, returning basic state", req.TableID)
+		// If no game engine, return basic table state
+		gameState = map[string]interface{}{
+			"table_id": table.ID,
+			"status":   "waiting",
+			"players":  nil, // Avoid calling GetDetailedInfo which might block
+		}
+	}
+
+	log.Printf("Successfully returning game state for table %s", req.TableID)
+	return h.successResponse(msg.RequestID, "game_state_response", map[string]interface{}{
+		"game_state": gameState,
+	})
+} // Webhook handler implementations (TableWebhookHandler interface)
 
 // OnTableCreated broadcasts table creation event
 func (h *TableWebSocketHandler) OnTableCreated(table *GameTable) {

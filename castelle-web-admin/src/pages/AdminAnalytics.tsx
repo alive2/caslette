@@ -32,11 +32,11 @@ const AdminAnalytics: React.FC = () => {
       try {
         // Fetch users
         const usersResponse = await userApi.getUsers();
-        const users = usersResponse.users || [];
+        const users = usersResponse.data?.users || [];
 
         // Fetch all diamond transactions
         const diamondsResponse = await diamondApi.getAllTransactions();
-        const transactions = diamondsResponse.transactions || [];
+        const transactions = diamondsResponse.data?.transactions || [];
 
         // Calculate analytics
         const totalUsers = users.length;

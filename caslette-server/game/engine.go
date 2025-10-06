@@ -81,6 +81,11 @@ type GameEngine interface {
 	// Events
 	GetEvents() []*GameEvent
 	SubscribeToEvents(callback func(*GameEvent))
+
+	// Additional methods for WebSocket integration
+	GetGameState() map[string]interface{}
+	GetHandHistory(limit int) []map[string]interface{}
+	GetPlayerStats(playerID string) map[string]interface{}
 }
 
 // BaseGameEngine provides common functionality for all game engines
@@ -350,4 +355,65 @@ func (b *BaseGameEngine) IsGameOver() bool {
 
 func (b *BaseGameEngine) GetWinners() []*Player {
 	return []*Player{}
+}
+
+// GetGameState returns the current game state for WebSocket clients
+func (b *BaseGameEngine) GetGameState() map[string]interface{} {
+	return map[string]interface{}{
+		"game_id":      b.gameID,
+		"state":        b.state,
+		"current_turn": b.currentTurn,
+		"players":      b.GetPlayers(),
+		"events_count": len(b.events),
+		"is_game_over": b.IsGameOver(),
+	}
+}
+
+// GetHandHistory returns hand history (base implementation)
+func (b *BaseGameEngine) GetHandHistory(limit int) []map[string]interface{} {
+	// Base implementation returns game events as history
+	history := make([]map[string]interface{}, 0)
+	eventCount := len(b.events)
+	start := 0
+	if limit > 0 && eventCount > limit {
+		start = eventCount - limit
+	}
+
+	for i := start; i < eventCount; i++ {
+		event := b.events[i]
+		history = append(history, map[string]interface{}{
+			"type":      event.Type,
+			"player_id": event.PlayerID,
+			"data":      event.Data,
+			"timestamp": event.Timestamp,
+		})
+	}
+
+	return history
+}
+
+// GetPlayerStats returns player statistics (base implementation)
+func (b *BaseGameEngine) GetPlayerStats(playerID string) map[string]interface{} {
+	player, err := b.GetPlayer(playerID)
+	if err != nil {
+		return map[string]interface{}{
+			"error": "Player not found",
+		}
+	}
+
+	// Count player events
+	eventCount := 0
+	for _, event := range b.events {
+		if event.PlayerID == playerID {
+			eventCount++
+		}
+	}
+
+	return map[string]interface{}{
+		"player_id":   player.ID,
+		"name":        player.Name,
+		"is_active":   player.IsActive,
+		"position":    player.Position,
+		"event_count": eventCount,
+	}
 }

@@ -379,17 +379,21 @@ class WebSocketService {
       timestamp: DateTime.now().millisecondsSinceEpoch,
     );
 
+    print('Sending WebSocket request: $type with ID: $requestId');
+    print('Request data: $data');
+
     final completer = Completer<WebSocketResponse>();
     _pendingRequests[requestId] = completer;
 
     // Send the message
     _sendMessage(message);
 
-    // Set timeout for the request
-    Timer(const Duration(seconds: 30), () {
+    // Set timeout for the request - reduced to 15 seconds for faster debugging
+    Timer(const Duration(seconds: 15), () {
       if (_pendingRequests.containsKey(requestId)) {
         _pendingRequests.remove(requestId);
         if (!completer.isCompleted) {
+          print('Request timeout for $type (ID: $requestId)');
           completer.completeError('Request timeout');
         }
       }
